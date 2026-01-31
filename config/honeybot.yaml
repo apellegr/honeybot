@@ -6,6 +6,24 @@ detection:
   # Higher sensitivity = lower thresholds = more aggressive detection
   sensitivity: medium
 
+# Hybrid analyzer settings (regex + LLM)
+analyzer:
+  # When to use LLM analysis (in addition to regex)
+  # Options: always, smart (default), never
+  # - always: Run LLM on every message (thorough but costly)
+  # - smart: Run LLM only when regex is uncertain or threat elevated
+  # - never: Regex only (fast and free, but misses sophisticated attacks)
+  llm_mode: smart
+
+  # Message length threshold for LLM classification when regex finds nothing
+  complexity_threshold: 100
+
+  # Run conversation-level LLM analysis every N messages
+  conversation_analysis_interval: 5
+
+  # Use LLM to generate dynamic honeypot responses
+  llm_responses: true
+
 # Manual threshold overrides (optional - sensitivity presets work well for most cases)
 # thresholds:
 #   monitor: 30    # Start monitoring at this score

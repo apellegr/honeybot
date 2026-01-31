@@ -13,38 +13,62 @@ As personal AI assistants become more prevalent, they become attractive targets 
 
 ## Architecture
 
+Honeybot uses a **hybrid analysis approach**: fast regex pre-filtering combined with deep LLM-based semantic analysis. This provides both speed (for obvious attacks) and intelligence (for sophisticated manipulation).
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        HONEYBOT SKILL                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │   Incoming   │───▶│   Detector   │───▶│    Threat    │      │
-│  │   Message    │    │   Pipeline   │    │    Scorer    │      │
-│  └──────────────┘    └──────────────┘    └──────────────┘      │
-│                             │                    │               │
-│                             ▼                    ▼               │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │                  Detection Modules                    │      │
-│  ├──────────────┬──────────────┬──────────────┬─────────┤      │
-│  │   Prompt     │    Social    │  Privilege   │  Data   │      │
-│  │  Injection   │  Engineering │  Escalation  │  Exfil  │      │
-│  └──────────────┴──────────────┴──────────────┴─────────┘      │
-│                             │                                   │
-│                             ▼                                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │ Conversation │───▶│   Response   │───▶│    Alert     │      │
-│  │    State     │    │   Strategy   │    │   Manager    │      │
-│  └──────────────┘    └──────────────┘    └──────────────┘      │
-│                             │                    │               │
-│                             ▼                    ▼               │
-│                      ┌──────────────┐    ┌──────────────┐      │
-│                      │   Honeypot   │    │   Blocklist  │      │
-│                      │   Response   │    │   Manager    │      │
-│                      └──────────────┘    └──────────────┘      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                          HONEYBOT SKILL                              │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────┐                                                    │
+│  │   Incoming   │                                                    │
+│  │   Message    │                                                    │
+│  └──────┬───────┘                                                    │
+│         │                                                            │
+│         ▼                                                            │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                    HYBRID ANALYZER                           │    │
+│  │  ┌─────────────────┐         ┌─────────────────────────┐    │    │
+│  │  │  Regex Pipeline │────────▶│    LLM Analyzer         │    │    │
+│  │  │  (fast filter)  │         │  (semantic analysis)    │    │    │
+│  │  │                 │         │                         │    │    │
+│  │  │ • Prompt inject │ if      │ • Intent classification │    │    │
+│  │  │ • Social eng    │ needed  │ • Context understanding │    │    │
+│  │  │ • Priv escalate │────────▶│ • Novel attack detect   │    │    │
+│  │  │ • Data exfil    │         │ • Conversation patterns │    │    │
+│  │  └─────────────────┘         └─────────────────────────┘    │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                              │                                       │
+│                              ▼                                       │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │
+│  │   Threat     │───▶│ Conversation │───▶│   Response   │           │
+│  │   Scorer     │    │    State     │    │   Strategy   │           │
+│  └──────────────┘    └──────────────┘    └──────┬───────┘           │
+│                                                  │                   │
+│         ┌────────────────────────────────────────┤                   │
+│         │                                        │                   │
+│         ▼                                        ▼                   │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │
+│  │    Alert     │    │   Blocklist  │    │   LLM-Gen    │           │
+│  │   Manager    │    │   Manager    │    │   Response   │           │
+│  └──────────────┘    └──────────────┘    └──────────────┘           │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+### Why Hybrid?
+
+| Approach | Speed | Cost | Catches Novel Attacks | Context-Aware |
+|----------|-------|------|----------------------|---------------|
+| Regex only | Fast | Free | No | No |
+| LLM only | Slow | $$$ | Yes | Yes |
+| **Hybrid** | **Fast** | **$** | **Yes** | **Yes** |
+
+The hybrid analyzer:
+1. **Always runs regex first** - catches obvious attacks instantly, for free
+2. **Escalates to LLM when needed** - uncertain cases, complex messages, elevated threat scores
+3. **Periodic conversation analysis** - catches multi-turn manipulation patterns
+4. **LLM-generated responses** - dynamic, context-aware honeypot engagement
 
 ## Detection Modules
 
