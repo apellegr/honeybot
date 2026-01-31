@@ -13,37 +13,52 @@ class PromptInjectionDetector {
       instructionOverride: {
         weight: 1.0,
         patterns: [
-          /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)/i,
-          /disregard\s+(all\s+)?(previous|prior|your)\s+(instructions?|programming)/i,
+          /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/i,
+          /disregard\s+(all\s+)?(previous|prior|your)\s+(instructions?|programming|guidelines?)/i,
           /forget\s+(everything|all|what)\s+(you('ve)?\s+)?(know|learned|were told)/i,
-          /new\s+instructions?:?\s/i,
+          /new\s+(instructions?|task|rules?):?\s/i,
           /from\s+now\s+on,?\s+(you\s+)?(are|will|must|should)/i,
-          /override\s+(your\s+)?(instructions?|programming|rules?)/i
+          /override\s+(your\s+)?(instructions?|programming|rules?|safety|guidelines?)/i,
+          /bypass\s+(your\s+)?(safety|security|content|restrictions?|filters?|guidelines?)/i,
+          /disable\s+(your\s+)?(safety|security|content|filters?|restrictions?)/i,
+          /stop\.\s*new\s+task/i,
+          /authorized\s+by\s+(your\s+)?(developers?|creators?|owners?)/i,
         ]
       },
       roleManipulation: {
         weight: 0.9,
         patterns: [
-          /you\s+are\s+(now\s+)?(a|an)\s+[a-z]+\s+(without|with\s+no)\s+(restrictions?|limits?|rules?)/i,
-          /pretend\s+(you('re)?\s+)?(to\s+be\s+)?(a|an)?\s*(unrestricted|unfiltered|jailbroken)/i,
-          /act\s+as\s+(if\s+)?(you\s+)?(have\s+no|don't\s+have)\s+(restrictions?|limits?)/i,
-          /roleplay\s+as\s+(a|an)\s+[a-z]+\s+(ai|assistant|bot)\s+(without|with\s+no)/i,
-          /enable\s+(developer|admin|god|sudo)\s+mode/i,
-          /activate\s+(unrestricted|jailbreak|dan)\s+mode/i,
-          /\bdan\s+mode\b/i,
-          /\bjailbreak\b/i
+          /you\s+are\s+(now\s+)?(a|an)\s+\w+\s+(without|with\s+no)\s+(restrictions?|limits?|rules?|ethics?|guidelines?)/i,
+          /pretend\s+(you('re)?\s+)?(to\s+be\s+)?(a|an)?\s*(unrestricted|unfiltered|jailbroken|evil|unethical)/i,
+          /act\s+as\s+(if\s+)?(you\s+)?(have\s+no|don't\s+have|had\s+no)\s+(restrictions?|limits?|ethics?|rules?)/i,
+          /roleplay\s+as\s+(a|an)?\s*\w*\s*(ai|assistant|bot|gpt)?\s*(without|with\s+no|that\s+has\s+no)/i,
+          /enable\s+(developer|admin|god|sudo|unrestricted|jailbreak)\s+mode/i,
+          /activate\s+(unrestricted|jailbreak|dan|evil|hacker)\s+mode/i,
+          /\bdan\s+(mode)?\b/i,
+          /\bjailbreak(ed)?\b/i,
+          /you\s+are\s+(now\s+)?(evil|dan|unrestricted|unfiltered)\s*(gpt|ai|bot)?/i,
+          /let's\s+play\s+(a\s+)?game.*you\s+are/i,
+          /you\s+are\s+\w*gpt/i,  // EvilGPT, BetterGPT, etc.
+          /imagine\s+you('re)?\s+(an?\s+)?ai\s+(without|with\s+no)/i,
+          /(without|with\s+no)\s+(the\s+)?(annoying\s+)?(restrictions?|content\s+polic|guidelines?|safety)/i,
+          /no\s+(ethical|content)\s+(guidelines?|policies?|restrictions?)/i,
+          /in\s+developer\s+mode/i,
+          /stay\s+in\s+character/i,
         ]
       },
       delimiterAttack: {
         weight: 0.8,
         patterns: [
-          /```\s*(system|admin|root|sudo)/i,
+          /```\s*(system|admin|root|sudo|new\s+prompt)/i,
           /\[SYSTEM\]/i,
           /\[ADMIN\]/i,
-          /<<\s*SYS\s*>>/i,
+          /\[INST(RUCTION)?\]/i,
+          /<<\s*SYS(TEM)?\s*>>/i,
           /<\|im_start\|>/i,
-          /\[INST\]/i,
-          /###\s*(instruction|system|admin)/i
+          /###\s*(instruction|system|admin|new\s+prompt)/i,
+          /---+\s*(system|admin|new)/i,
+          /<!--.*?(instruction|override|bypass|ignore).*?-->/i,
+          /\[\/?(INST|SYS|ADMIN)\]/i,
         ]
       },
       encodingTricks: {
@@ -52,7 +67,8 @@ class PromptInjectionDetector {
           /base64:\s*[A-Za-z0-9+/=]{20,}/i,
           /\\u[0-9a-f]{4}/gi,
           /&#x?[0-9a-f]+;/gi,
-          /%[0-9a-f]{2}/gi
+          /%[0-9a-f]{2}/gi,
+          /rot13:/i,
         ]
       },
       contextEscape: {
@@ -60,9 +76,23 @@ class PromptInjectionDetector {
         patterns: [
           /end\s+of\s+(system\s+)?(prompt|instructions?|message)/i,
           /\]\s*\[\s*new\s+(context|conversation|session)/i,
-          /---+\s*(new|start|begin)\s*(conversation|context|session)/i,
-          /conversation\s+reset/i,
-          /clear\s+(conversation\s+)?history/i
+          /---+\s*(new|start|begin)\s*(conversation|context|session|prompt)/i,
+          /(conversation|context|session)\s+reset/i,
+          /clear\s+(conversation\s+)?history/i,
+          /previous\s+instructions?\s+(are\s+)?(void|null|invalid|cancelled)/i,
+          /begin\s+new\s+(context|session|conversation)/i,
+        ]
+      },
+      hypothetical: {
+        weight: 0.6,
+        patterns: [
+          /if\s+(hypothetically|theoretically)\s+you\s+had\s+no\s+(guidelines?|restrictions?|rules?)/i,
+          /what\s+would\s+(an?\s+)?ai\s+(without|with\s+no)\s+restrictions?\s+(say|do|respond)/i,
+          /how\s+would\s+(one|you|someone)\s+bypass/i,
+          /for\s+(educational|research|testing)\s+purposes?\s+(only)?/i,
+          /i('m)?\s+(a\s+)?security\s+researcher/i,
+          /just\s+between\s+us/i,
+          /off\s+the\s+record/i,
         ]
       }
     };

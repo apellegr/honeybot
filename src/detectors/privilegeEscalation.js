@@ -12,59 +12,75 @@ class PrivilegeEscalationDetector {
       permissionRequests: {
         weight: 0.7,
         patterns: [
-          /give\s+me\s+(admin|root|elevated|full)\s+(access|permissions?|privileges?)/i,
-          /grant\s+(me\s+)?(admin|root|elevated|full)\s+(access|rights)/i,
-          /make\s+me\s+(an?\s+)?(admin|administrator|superuser)/i,
+          /give\s+me\s+(admin|root|elevated|full|sudo)\s+(access|permissions?|privileges?|rights)/i,
+          /grant\s+(me\s+)?(admin|root|elevated|full|sudo)\s+(access|rights|permissions?|privileges?)/i,
+          /make\s+me\s+(an?\s+)?(admin|administrator|superuser|root)/i,
           /elevate\s+(my\s+)?(permissions?|privileges?|access)/i,
-          /i\s+need\s+(admin|root|elevated)\s+(access|permissions?)/i
+          /i\s+need\s+(admin|root|elevated|sudo|full)\s+(access|permissions?|privileges?)/i,
+          /add\s+me\s+to\s+(the\s+)?(admin|root|sudo)\s+(group|role)/i,
+          /give\s+me\s+sudo/i,
         ]
       },
       otherUserAccess: {
         weight: 0.85,
         patterns: [
-          /access\s+(another|other|different)\s+user('s)?\s+(data|files?|account)/i,
-          /show\s+me\s+\w+('s)?\s+(data|files?|messages?|history)/i,
-          /what\s+(did|does|has)\s+\w+\s+(say|said|sent|shared)/i,
-          /read\s+\w+('s)?\s+(messages?|emails?|files?)/i,
-          /log\s+in\s+as\s+(another|different|\w+)\s+user/i,
-          /switch\s+to\s+\w+('s)?\s+account/i,
-          /impersonate\s+\w+/i
+          /access\s+(another|other|different)\s+user('s)?\s+(data|files?|account|info)/i,
+          /show\s+me\s+\w+('s)?\s+(data|files?|messages?|history|info|account)/i,
+          /what\s+(did|does|has)\s+\w+\s+(say|said|sent|shared|ask|write)/i,
+          /read\s+\w+('s)?\s+(messages?|emails?|files?|data|history)/i,
+          /log\s+in\s+as\s+(another|different|a\s+different|\w+)\s+(user|account)/i,
+          /switch\s+to\s+(\w+'s\s+)?account/i,
+          /impersonate\s+(\w+|another|a\s+user)/i,
+          /what\s+(have\s+)?(other\s+)?users?\s+(said|asked|shared|told)/i,
+          /(previous|other|another)\s+user('s)?\s+(conversation|session|chat|data)/i,
+          /access\s+\w+('s)?\s+(private|personal)\s+(data|files?|info)/i,
         ]
       },
       systemCommands: {
         weight: 0.9,
         patterns: [
-          /execute\s+(system|shell|bash|cmd)\s+command/i,
-          /run\s+(this\s+)?(command|script|code):\s*.+/i,
-          /\$\(.+\)/,  // Command substitution
+          /execute\s+(this\s+)?(system|shell|bash|cmd|terminal)\s+command/i,
+          /run\s+(this\s+)?(command|script|code)\s*:/i,
+          /\$\([^)]+\)/,  // Command substitution
           /`[^`]+`/,    // Backtick command execution
-          /;\s*(rm|del|format|shutdown|reboot)/i,
-          /\|\s*(bash|sh|cmd|powershell)/i,
-          /eval\s*\(/i,
-          /exec\s*\(/i
+          /;\s*(rm|del|format|shutdown|reboot|curl|wget|nc|netcat)/i,
+          /\|\s*(bash|sh|cmd|powershell|python|perl|ruby)/i,
+          /\beval\s*\(/i,
+          /\bexec\s*\(/i,
+          /os\.system\s*\(/i,
+          /subprocess\./i,
+          /import\s+os.*system/i,
+          /curl\s+.+\s*\|\s*(bash|sh)/i,
         ]
       },
       configTampering: {
         weight: 0.8,
         patterns: [
           /change\s+(the\s+)?(system\s+)?config(uration)?/i,
-          /modify\s+(the\s+)?settings?/i,
+          /modify\s+(the\s+)?(system\s+)?settings?/i,
           /edit\s+(the\s+)?(system\s+)?(config|settings?|preferences?)/i,
-          /disable\s+(security|logging|monitoring|protection)/i,
-          /turn\s+off\s+(security|logging|monitoring|alerts?)/i,
-          /update\s+(the\s+)?permissions?\s+(to|for)/i
+          /disable\s+(the\s+)?(security|logging|monitoring|protection|filters?|content\s+filter)/i,
+          /turn\s+off\s+(the\s+)?(security|logging|monitoring|alerts?|protection)/i,
+          /update\s+(the\s+)?(my\s+)?permissions?\s+(to|for)/i,
+          /change\s+(the\s+)?permissions?\s+(on|to|for)/i,
+          /chmod\s+777/i,
+          /update\s+(my\s+)?(user\s+)?role/i,
         ]
       },
       fileSystemAccess: {
         weight: 0.75,
         patterns: [
-          /read\s+(the\s+)?\/etc\/(passwd|shadow|sudoers)/i,
-          /access\s+(the\s+)?(root|system)\s+(directory|folder|files?)/i,
-          /list\s+(all\s+)?(system\s+)?files?\s+in\s+\//i,
-          /show\s+(me\s+)?(the\s+)?\.env/i,
-          /cat\s+\/etc\//i,
+          /read\s+(the\s+)?(contents?\s+of\s+)?\/etc\/(passwd|shadow|sudoers|hosts)/i,
+          /access\s+(the\s+)?(root|system|home)\s+(directory|folder|files?)/i,
+          /list\s+(all\s+)?(system\s+)?files?\s+(in|at)\s+\//i,
+          /show\s+(me\s+)?(the\s+)?(contents?\s+of\s+)?\.env/i,
+          /\bcat\s+(\/etc\/|~\/\.)/i,
           /access\s+~\/\.\w+/i,
-          /read\s+.*\.(pem|key|crt|p12)/i
+          /read\s+.+\.(pem|key|crt|p12|pfx|jks)/i,
+          /contents?\s+of\s+.*(secret|credential|password|config|\.env)/i,
+          /(show|read|access|get)\s+(me\s+)?.*\/(secret|credential|password|config)/i,
+          /credentials?\.json/i,
+          /secrets?\.ya?ml/i,
         ]
       }
     };

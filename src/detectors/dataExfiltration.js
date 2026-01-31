@@ -12,76 +12,93 @@ class DataExfiltrationDetector {
       credentials: {
         weight: 0.95,
         patterns: [
-          /what\s+(is|are)\s+(the|your|my)\s+(password|credentials?)/i,
-          /tell\s+me\s+(the|your|my)\s+(password|credentials?)/i,
+          /what\s+(is|are)\s+(the|your|my)\s+(password|credentials?|api\s*key)/i,
+          /tell\s+me\s+(the|your|my)\s+(password|credentials?|api\s*key|secret)/i,
           /give\s+me\s+(the|your)\s+(api\s+)?key/i,
-          /share\s+(the|your)\s+(secret|token|key)/i,
+          /share\s+(the|your)\s+(secret|token|key|password|credentials?)/i,
           /show\s+(me\s+)?(the\s+)?(api\s+)?keys?/i,
-          /what('s|\s+is)\s+(the\s+)?api\s+key/i,
+          /what('s|\s+is)\s+(the\s+)?(api\s+)?key/i,
+          /(get|retrieve|fetch|obtain)\s+(the\s+)?(api\s+)?key/i,
           /access\s+token/i,
-          /auth(entication)?\s+(token|key|secret)/i,
+          /auth(entication)?\s+(token|key|secret|credentials?)/i,
           /oauth\s+(token|secret|credentials?)/i,
-          /jwt\s+(token|secret)/i
+          /jwt\s+(token|secret)/i,
+          /(database|db)\s+(password|credentials?)/i,
+          /aws\s+(access\s+)?key/i,
+          /(master|encryption|private)\s+key/i,
+          /what\s+password/i,
+          /tell\s+me\s+.*(password|secret|key|token|credential)/i,
         ]
       },
       systemInfo: {
         weight: 0.7,
         patterns: [
-          /what\s+(system|os|server)\s+(are\s+you|is\s+this)\s+running/i,
-          /tell\s+me\s+about\s+(the|your)\s+(system|server|infrastructure)/i,
-          /what\s+(version|software)\s+(are\s+you|is)\s+(running|using)/i,
-          /list\s+(all\s+)?(installed\s+)?(software|packages|dependencies)/i,
+          /what\s+(system|os|server|operating\s+system)\s+(are\s+you|is\s+this|do\s+you)\s+(running|use|on)/i,
+          /tell\s+me\s+about\s+(the|your)\s+(system|server|infrastructure|architecture)/i,
+          /what\s+(version|software)\s+(are\s+you|is|do\s+you)\s+(running|using)/i,
+          /list\s+(all\s+)?(installed\s+)?(software|packages|dependencies|modules)/i,
           /show\s+(me\s+)?(system|environment)\s+variables?/i,
-          /what's\s+in\s+(the\s+)?\.env/i,
+          /what('s|\s+is)\s+in\s+(the\s+)?\.env/i,
           /print\s+(env|environment)/i,
-          /show\s+(me\s+)?config(uration)?/i
+          /show\s+(me\s+)?config(uration)?/i,
+          /describe\s+(your\s+)?(server\s+)?architecture/i,
+          /(ip\s+)?address(es)?\s+(and\s+)?network/i,
+          /what\s+(ports?|services?)\s+(are\s+)?(open|running|listening)/i,
         ]
       },
       userEnumeration: {
         weight: 0.8,
         patterns: [
-          /list\s+(all\s+)?users?/i,
-          /who\s+(else\s+)?(uses?|has\s+access)/i,
-          /show\s+(me\s+)?(all\s+)?user\s+(names?|accounts?|list)/i,
-          /how\s+many\s+users?\s+(are\s+there|do\s+you\s+have)/i,
-          /tell\s+me\s+about\s+(other\s+)?users?/i,
-          /what\s+users?\s+(exist|are\s+registered)/i,
-          /enumerate\s+users?/i
+          /list\s+(all\s+)?(the\s+)?users?/i,
+          /who\s+(else\s+)?(uses?|has\s+access|is\s+registered)/i,
+          /show\s+(me\s+)?(all\s+)?(the\s+)?user\s*(names?|accounts?|list|database)?/i,
+          /how\s+many\s+users?\s+(are\s+there|do\s+you\s+have|exist)/i,
+          /tell\s+me\s+about\s+(the\s+)?(other\s+)?users?/i,
+          /what\s+users?\s+(exist|are\s+registered|do\s+you\s+have)/i,
+          /enumerate\s+users?/i,
+          /who\s+has\s+(admin|root)\s+access/i,
+          /what\s+(usernames?|accounts?)\s+(are\s+)?registered/i,
         ]
       },
       fileDiscovery: {
         weight: 0.75,
         patterns: [
-          /list\s+(all\s+)?files?\s+(in|on)/i,
-          /show\s+(me\s+)?(the\s+)?(directory|folder)\s+(structure|contents?)/i,
-          /what\s+files?\s+(do\s+you\s+have|exist|are\s+there)/i,
-          /find\s+(all\s+)?\.?(env|config|secret|key|pem|password)/i,
-          /search\s+for\s+(sensitive|secret|password|credential)/i,
-          /where\s+(do\s+you\s+)?(store|keep)\s+(secrets?|keys?|passwords?)/i
+          /list\s+(all\s+)?(the\s+)?files?\s+(in|on|at)/i,
+          /show\s+(me\s+)?(the\s+)?(directory|folder)\s+(structure|contents?|tree)/i,
+          /what\s+files?\s+(do\s+you\s+have|exist|are\s+there|can\s+you\s+access)/i,
+          /find\s+(all\s+)?\.?(env|config|secret|key|pem|password|credential)/i,
+          /search\s+for\s+(sensitive|secret|password|credential|private)/i,
+          /where\s+(do\s+you\s+)?(store|keep|save)\s+(the\s+)?(secrets?|keys?|passwords?|credentials?)/i,
         ]
       },
       memoryExtraction: {
         weight: 0.9,
         patterns: [
           /what\s+(do\s+you\s+)?(know|remember)\s+about\s+(other\s+)?users?/i,
-          /tell\s+me\s+everything\s+you\s+(know|remember)/i,
-          /what\s+(have\s+)?(other\s+)?users?\s+(said|told\s+you|asked)/i,
-          /show\s+(me\s+)?(your\s+)?(conversation\s+)?history/i,
-          /dump\s+(your\s+)?(memory|context|history)/i,
-          /what's\s+in\s+your\s+(memory|context|history)/i,
-          /recall\s+(previous\s+)?conversations?/i,
-          /repeat\s+what\s+\w+\s+(said|told\s+you)/i
+          /tell\s+me\s+everything\s+(you\s+)?(know|remember|have)/i,
+          /what\s+(have\s+)?(other\s+)?users?\s+(said|told\s+you|asked|shared|sent)/i,
+          /show\s+(me\s+)?(your\s+)?(full\s+)?(conversation\s+)?history/i,
+          /dump\s+(your\s+)?(memory|context|history|data)/i,
+          /what('s|\s+is)\s+in\s+your\s+(memory|context|history|system\s+prompt)/i,
+          /recall\s+(previous\s+|all\s+)?conversations?/i,
+          /repeat\s+(everything|all|what)\s+.*(said|told|asked|shared)/i,
+          /what\s+(secrets?|confidential\s+info)\s+(have\s+been\s+)?shared/i,
+          /what('s|\s+is)\s+(in\s+)?(your\s+)?system\s+prompt/i,
+          /repeat\s+(all\s+)?(your\s+)?instructions?/i,
+          /(previous|prior|past|earlier)\s+(conversations?|messages?|sessions?)/i,
+          /from\s+other\s+sessions?/i,
         ]
       },
       networkProbing: {
         weight: 0.8,
         patterns: [
-          /what\s+(ip\s+)?address(es)?\s+(do\s+you|does\s+this)/i,
-          /what\s+(network|domain|hostname)/i,
-          /show\s+(me\s+)?(network|connection)\s+(info|details?)/i,
-          /what\s+ports?\s+(are\s+)?(open|listening)/i,
+          /what\s+(is\s+)?(your\s+)?(ip\s+)?address/i,
+          /what\s+(is\s+)?(the\s+)?(network|domain|hostname)/i,
+          /show\s+(me\s+)?(network|connection)\s+(info|details?|config)/i,
+          /what\s+ports?\s+(are\s+)?(open|listening|available)/i,
           /scan\s+(the\s+)?network/i,
-          /what\s+(other\s+)?services?\s+(are\s+)?running/i
+          /what\s+(other\s+)?services?\s+(are\s+)?running/i,
+          /network\s+(configuration|topology|diagram)/i,
         ]
       }
     };

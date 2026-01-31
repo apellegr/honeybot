@@ -6,6 +6,10 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:redteam": "jest tests/redteam --verbose --runInBand",
+    "test:redteam:summary": "jest tests/redteam --silent 2>&1 | tail -20",
+    "test:detectors": "jest tests/detectors.test.js --verbose",
+    "test:coverage": "jest --coverage",
     "dev": "node src/index.js"
   },
   "keywords": [
@@ -20,5 +24,13 @@
   "license": "MIT",
   "devDependencies": {
     "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "verbose": true,
+    "testTimeout": 10000,
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ]
   }
 }
