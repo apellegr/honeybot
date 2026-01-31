@@ -1,0 +1,24 @@
+{
+  "name": "honeybot",
+  "version": "0.1.0",
+  "description": "A Clawdbot skill for detecting and blocking malicious agents/users attempting to manipulate AI assistants",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "dev": "node src/index.js"
+  },
+  "keywords": [
+    "clawdbot",
+    "skill",
+    "security",
+    "honeypot",
+    "ai-safety",
+    "manipulation-detection"
+  ],
+  "author": "apellegr",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

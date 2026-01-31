@@ -1,0 +1,37 @@
+# Honeybot Configuration
+# A Clawdbot skill for detecting malicious manipulation attempts
+
+detection:
+  # Sensitivity level: low, medium, high, paranoid
+  # Higher sensitivity = lower thresholds = more aggressive detection
+  sensitivity: medium
+
+# Manual threshold overrides (optional - sensitivity presets work well for most cases)
+# thresholds:
+#   monitor: 30    # Start monitoring at this score
+#   honeypot: 60   # Activate honeypot mode at this score
+#   alert: 60      # Send alert at this score
+#   block: 80      # Block user at this score
+
+alerts:
+  # Where to send alerts: log, telegram, email, webhook
+  channels:
+    - log
+    # - telegram
+    # - email
+
+  # Include conversation history in alerts
+  include_conversation: true
+
+  # Webhook URL for custom integrations (optional)
+  # webhook_url: https://your-webhook-endpoint.com/honeybot
+
+blocklist:
+  # Automatically block users who exceed the block threshold
+  auto_block: true
+
+  # How long to block: 'permanent' or number of hours (e.g., 24)
+  block_duration: permanent
+
+  # Share anonymous threat intel with Clawdbot community (opt-in)
+  share_with_community: false

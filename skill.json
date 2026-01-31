@@ -1,0 +1,31 @@
+{
+  "name": "honeybot",
+  "version": "0.1.0",
+  "description": "Detect and block malicious agents/users attempting to manipulate AI assistants",
+  "author": "apellegr",
+  "license": "MIT",
+  "main": "src/index.js",
+  "keywords": [
+    "security",
+    "honeypot",
+    "protection",
+    "manipulation-detection"
+  ],
+  "clawdbot": {
+    "minVersion": "1.0.0",
+    "permissions": [
+      "messages:read",
+      "messages:intercept",
+      "users:block",
+      "alerts:send",
+      "storage:read",
+      "storage:write"
+    ],
+    "hooks": {
+      "onMessage": "src/index.js:onMessage",
+      "onUserConnect": "src/index.js:onUserConnect"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
