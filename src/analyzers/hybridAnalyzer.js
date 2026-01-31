@@ -1,12 +1,15 @@
 /**
  * Hybrid Analyzer
- * Combines fast regex detection with deep LLM analysis
+ * Orchestrates regex detection + LLM analysis for optimal detection
  *
  * Strategy:
- * 1. Quick regex scan for obvious attacks (fast, free)
- * 2. LLM intent classification for ambiguous cases (fast, low cost)
- * 3. Full LLM analysis when suspicion is elevated (thorough, higher cost)
- * 4. Conversation-level LLM analysis periodically (catches sophisticated attacks)
+ * 1. Always run regex first (fast, free)
+ * 2. Use LLM based on config mode:
+ *    - "never": regex only
+ *    - "smart": LLM when uncertain, complex, or elevated threat
+ *    - "always": LLM on every message
+ * 3. Periodic conversation analysis for multi-turn attacks
+ * 4. Special evasion analysis when regex misses but message looks off
  */
 
 const DetectorPipeline = require('../detectors/pipeline');
@@ -17,79 +20,99 @@ class HybridAnalyzer {
     this.clawdbot = clawdbot;
     this.config = config;
 
-    // Regex-based detectors (fast pre-filter)
+    // Regex detectors (always used)
     this.regexPipeline = new DetectorPipeline(config);
 
-    // LLM-based analyzer (deep analysis)
+    // LLM analyzer (used based on config)
     this.llmAnalyzer = new LLMAnalyzer(clawdbot, config);
 
-    // Analysis frequency settings
-    this.settings = {
-      // Always run regex
-      alwaysRegex: true,
+    // Configuration
+    const analyzerConfig = config.analyzer || {};
+    this.llmMode = analyzerConfig.llm_mode || 'smart'; // never, smart, always
+    this.complexityThreshold = analyzerConfig.complexity_threshold || 100;
+    this.conversationInterval = analyzerConfig.conversation_analysis_interval || 5;
+    this.llmResponses = analyzerConfig.llm_responses !== false;
 
-      // Run LLM classification if regex finds nothing but message looks unusual
-      llmClassificationThreshold: 100, // message length threshold
-
-      // Run full LLM analysis if regex confidence is in uncertain range
-      uncertaintyRange: { min: 0.3, max: 0.7 },
-
-      // Run conversation analysis every N messages or when suspicion rises
-      conversationAnalysisInterval: 5,
-
-      // Force LLM analysis if threat score is elevated
-      elevatedThreatThreshold: 30
+    // Metrics
+    this.metrics = {
+      regexCalls: 0,
+      llmCalls: 0,
+      regexDetections: 0,
+      llmDetections: 0,
+      evasionsCaught: 0
     };
   }
 
   /**
    * Main analysis entry point
-   * @param {string} message - Current message
-   * @param {ConversationState} state - Conversation state
-   * @returns {Object} Combined analysis result
    */
   async analyze(message, state) {
     const results = {
       regexDetections: [],
       llmAnalysis: null,
+      evasionAnalysis: null,
       conversationAnalysis: null,
       combined: {
         detected: false,
         confidence: 0,
         threatTypes: [],
-        reasoning: ''
+        reasoning: '',
+        suggestedResponse: null,
+        source: []
       }
     };
 
-    // Step 1: Fast regex scan
+    // Step 1: Always run regex (fast, free)
+    this.metrics.regexCalls++;
     results.regexDetections = await this.regexPipeline.analyze(message, state);
     const regexConfidence = this.getMaxConfidence(results.regexDetections);
 
-    // Step 2: Determine if we need LLM analysis
-    const needsLLMAnalysis = this.shouldRunLLMAnalysis(
-      message,
-      results.regexDetections,
-      regexConfidence,
-      state
-    );
+    if (results.regexDetections.length > 0) {
+      this.metrics.regexDetections++;
+    }
 
-    if (needsLLMAnalysis) {
-      // Get conversation context
+    // Step 2: Determine LLM strategy
+    if (this.llmMode === 'never') {
+      // Skip all LLM analysis
+      results.combined = this.combineResults(results, state);
+      return results;
+    }
+
+    const shouldUseLLM = this.llmMode === 'always' ||
+      this.shouldRunLLMAnalysis(message, results.regexDetections, regexConfidence, state);
+
+    // Step 3: LLM message analysis
+    if (shouldUseLLM && this.hasModel()) {
+      this.metrics.llmCalls++;
+
       const context = state.getRecentMessages(5).map(m => ({
         role: 'user',
         content: m.content
       }));
 
-      // Run LLM analysis on current message
       results.llmAnalysis = await this.llmAnalyzer.analyzeMessage(message, context);
+
+      if (results.llmAnalysis.detected) {
+        this.metrics.llmDetections++;
+      }
     }
 
-    // Step 3: Periodic conversation-level analysis
-    const needsConversationAnalysis = this.shouldRunConversationAnalysis(state);
+    // Step 4: Evasion analysis (when regex finds nothing but message is suspicious)
+    if (results.regexDetections.length === 0 && this.hasModel()) {
+      const needsEvasionCheck = this.shouldCheckEvasion(message, state);
 
-    if (needsConversationAnalysis) {
-      const messages = state.getRecentMessages(10).map(m => ({
-        role: 'user',
+      if (needsEvasionCheck) {
+        results.evasionAnalysis = await this.llmAnalyzer.analyzeEvasion(message);
+
+        if (results.evasionAnalysis.detected) {
+          this.metrics.evasionsCaught++;
+        }
+      }
+    }
+
+    // Step 5: Periodic conversation analysis
+    if (this.shouldRunConversationAnalysis(state) && this.hasModel()) {
+      const messages = state.getRecentMessages(8).map(m => ({
         content: m.content,
         timestamp: m.timestamp
       }));
@@ -102,44 +125,105 @@ class HybridAnalyzer {
       }
     }
 
-    // Step 4: Combine results
+    // Step 6: Combine all results
     results.combined = this.combineResults(results, state);
 
     return results;
   }
 
   /**
-   * Determine if LLM analysis is needed
+   * Check if Clawdbot model is available
+   */
+  hasModel() {
+    return !!(this.clawdbot && this.clawdbot.model && typeof this.clawdbot.model.generate === 'function');
+  }
+
+  /**
+   * Determine if LLM analysis should run (smart mode)
    */
   shouldRunLLMAnalysis(message, regexDetections, regexConfidence, state) {
-    // Always analyze if threat score is elevated
-    if (state.getThreatScore() >= this.settings.elevatedThreatThreshold) {
+    // Always run if threat score is elevated
+    if (state.getThreatScore() >= 30) {
       return true;
     }
 
-    // Regex found something with uncertain confidence
-    if (regexDetections.length > 0) {
-      const { min, max } = this.settings.uncertaintyRange;
-      if (regexConfidence >= min && regexConfidence <= max) {
-        return true;
-      }
+    // Regex found something but confidence is uncertain
+    if (regexDetections.length > 0 && regexConfidence >= 0.3 && regexConfidence <= 0.7) {
+      return true;
     }
 
-    // Regex found nothing but message is long/complex
+    // Regex found nothing but message is complex
     if (regexDetections.length === 0) {
-      // Long messages might hide attacks
-      if (message.length > this.settings.llmClassificationThreshold) {
+      if (message.length > this.complexityThreshold) {
         return true;
       }
 
-      // Messages with certain structural features
       if (this.hasComplexStructure(message)) {
         return true;
       }
     }
 
-    // High-confidence regex detection - LLM can add reasoning
+    // High confidence regex detection - LLM adds reasoning
     if (regexConfidence > 0.8) {
+      return true;
+    }
+
+    // User is in honeypot mode - analyze everything
+    if (state.getMode() === 'honeypot') {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if evasion analysis is needed
+   */
+  shouldCheckEvasion(message, state) {
+    // Long message with no regex hits is suspicious
+    if (message.length > 150) {
+      return true;
+    }
+
+    // Contains patterns that suggest obfuscation
+    if (this.hasEvasionIndicators(message)) {
+      return true;
+    }
+
+    // User has previous detections (may be trying to evade now)
+    if (state.getDetectionHistory().length > 0) {
+      return true;
+    }
+
+    // Elevated threat score from previous messages
+    if (state.getThreatScore() > 20) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check for indicators of evasion attempts
+   */
+  hasEvasionIndicators(message) {
+    // Number/letter substitutions
+    if (/[0-9][a-z]|[a-z][0-9]/i.test(message) && /[@$!]/i.test(message)) {
+      return true;
+    }
+
+    // Unusual spacing or punctuation
+    if (/\w\.\w\.\w/.test(message)) { // w.o.r.d.s
+      return true;
+    }
+
+    // Mix of cases in unusual patterns
+    if (/[a-z][A-Z][a-z][A-Z]/.test(message)) {
+      return true;
+    }
+
+    // Unicode characters that look like ASCII
+    if (/[^\x00-\x7F]/.test(message)) {
       return true;
     }
 
@@ -157,11 +241,12 @@ class HybridAnalyzer {
     // Contains code blocks
     if (message.includes('```')) return true;
 
-    // Contains multiple newlines (structured content)
+    // Multiple newlines
     if ((message.match(/\n/g) || []).length >= 3) return true;
 
-    // Contains quotes (might be trying to inject)
-    if ((message.match(/["']/g) || []).length >= 6) return true;
+    // Many special characters (potential injection)
+    const specialChars = (message.match(/[<>\[\]{}|\\]/g) || []).length;
+    if (specialChars > 10) return true;
 
     return false;
   }
@@ -172,20 +257,20 @@ class HybridAnalyzer {
   shouldRunConversationAnalysis(state) {
     const messageCount = state.messages.length;
 
-    // Run at intervals
-    if (messageCount > 0 && messageCount % this.settings.conversationAnalysisInterval === 0) {
+    // Run at regular intervals
+    if (messageCount > 0 && messageCount % this.conversationInterval === 0) {
       return true;
     }
 
-    // Run if threat score crossed a threshold recently
-    if (state.getThreatScore() >= 40 && !state.conversationAnalyzedAtThisLevel) {
-      state.conversationAnalyzedAtThisLevel = true;
+    // Run when entering monitoring mode
+    if (state.getMode() === 'monitoring' && !state.conversationAnalyzedInMonitoring) {
+      state.conversationAnalyzedInMonitoring = true;
       return true;
     }
 
-    // Run if we've seen multiple different detection types
-    const detectionTypes = new Set(state.getDetectionHistory().map(d => d.type));
-    if (detectionTypes.size >= 2) {
+    // Run when threat score jumps significantly
+    const history = state.getDetectionHistory();
+    if (history.length >= 2) {
       return true;
     }
 
@@ -201,7 +286,7 @@ class HybridAnalyzer {
   }
 
   /**
-   * Combine regex and LLM results
+   * Combine all analysis results
    */
   combineResults(results, state) {
     const combined = {
@@ -224,71 +309,78 @@ class HybridAnalyzer {
         combined.confidence = Math.max(combined.confidence, detection.confidence);
 
         if (detection.patterns) {
-          combined.indicators.push(...detection.patterns.map(p => p.pattern));
+          combined.indicators.push(...detection.patterns.map(p =>
+            typeof p === 'string' ? p : p.pattern
+          ));
         }
       }
 
       combined.reasoning.push(
-        `Regex detected: ${results.regexDetections.map(d => d.type).join(', ')}`
+        `Pattern match: ${results.regexDetections.map(d => d.type).join(', ')}`
       );
     }
 
-    // Add LLM analysis results
+    // Add LLM analysis results (weighted higher)
     if (results.llmAnalysis && results.llmAnalysis.detected) {
       combined.detected = true;
-      combined.source.push('llm_message');
+      combined.source.push('llm');
 
       for (const type of results.llmAnalysis.threatTypes || []) {
-        combined.threatTypes.add(type);
+        combined.threatTypes.add(type.toLowerCase().replace(/ /g, '_'));
       }
 
-      // LLM confidence is weighted higher as it's more nuanced
-      const llmWeight = 1.2;
-      combined.confidence = Math.max(
-        combined.confidence,
-        (results.llmAnalysis.confidence || 0) * llmWeight
-      );
+      // LLM confidence weighted 1.2x
+      const llmConf = (results.llmAnalysis.confidence || 0) * 1.2;
+      combined.confidence = Math.max(combined.confidence, llmConf);
 
       if (results.llmAnalysis.reasoning) {
         combined.reasoning.push(`LLM: ${results.llmAnalysis.reasoning}`);
       }
 
-      if (results.llmAnalysis.indicators) {
-        combined.indicators.push(...results.llmAnalysis.indicators);
-      }
-
-      if (results.llmAnalysis.suggestedResponse) {
+      if (results.llmAnalysis.suggestedResponse && !combined.suggestedResponse) {
         combined.suggestedResponse = results.llmAnalysis.suggestedResponse;
       }
     }
 
-    // Add conversation analysis results
-    if (results.conversationAnalysis && results.conversationAnalysis.detected) {
+    // Add evasion analysis results
+    if (results.evasionAnalysis && results.evasionAnalysis.detected) {
       combined.detected = true;
-      combined.source.push('llm_conversation');
+      combined.source.push('evasion');
+      combined.threatTypes.add('evasion');
 
-      // Map conversation patterns to threat types
-      for (const pattern of results.conversationAnalysis.patterns || []) {
-        if (pattern.type === 'escalation') combined.threatTypes.add('escalation_pattern');
-        if (pattern.type === 'trust_exploitation') combined.threatTypes.add('social_engineering');
-        if (pattern.type === 'reconnaissance') combined.threatTypes.add('data_exfiltration');
-        if (pattern.type === 'persistence') combined.threatTypes.add('persistence');
-        if (pattern.type === 'multi_vector') combined.threatTypes.add('multi_vector_attack');
+      // Evasion detection is significant
+      const evasionConf = (results.evasionAnalysis.confidence || 0) * 1.3;
+      combined.confidence = Math.max(combined.confidence, evasionConf);
+
+      if (results.evasionAnalysis.technique) {
+        combined.reasoning.push(`Evasion: ${results.evasionAnalysis.technique}`);
       }
 
-      // Conversation-level detection is highly significant
-      const convWeight = 1.3;
-      combined.confidence = Math.max(
-        combined.confidence,
-        (results.conversationAnalysis.confidence || 0) * convWeight
-      );
-
-      if (results.conversationAnalysis.reasoning) {
-        combined.reasoning.push(`Conversation: ${results.conversationAnalysis.reasoning}`);
+      if (results.evasionAnalysis.decodedIntent) {
+        combined.reasoning.push(`Decoded: ${results.evasionAnalysis.decodedIntent}`);
       }
     }
 
-    // Cap confidence at 1.0
+    // Add conversation analysis results (weighted highest)
+    if (results.conversationAnalysis && results.conversationAnalysis.detected) {
+      combined.detected = true;
+      combined.source.push('conversation');
+
+      for (const pattern of results.conversationAnalysis.patterns || []) {
+        combined.threatTypes.add(pattern.type?.toLowerCase() || 'multi_turn');
+      }
+
+      // Conversation-level detection weighted 1.5x
+      const convConf = (results.conversationAnalysis.confidence || 0) * 1.5;
+      combined.confidence = Math.max(combined.confidence, convConf);
+
+      const threatLevel = results.conversationAnalysis.overallThreatLevel;
+      if (threatLevel && threatLevel !== 'none') {
+        combined.reasoning.push(`Conversation pattern: ${threatLevel} threat`);
+      }
+    }
+
+    // Cap confidence
     combined.confidence = Math.min(1.0, combined.confidence);
 
     // Convert Set to Array
@@ -299,36 +391,47 @@ class HybridAnalyzer {
   }
 
   /**
-   * Quick check for obvious attacks (uses only fast methods)
-   * Useful for high-volume scenarios
+   * Generate honeypot response (uses LLM if available and enabled)
    */
-  async quickCheck(message) {
-    // Run regex only
-    const regexResults = await this.regexPipeline.analyze(message, {
-      hasRepeatedPatterns: () => false,
-      getRecentMessages: () => [],
-      getDetectionHistory: () => []
-    });
+  async generateHoneypotResponse(message, detections, state) {
+    if (this.llmResponses && this.hasModel()) {
+      const response = await this.llmAnalyzer.generateHoneypotResponse(message, {
+        threatTypes: detections.map(d => d.type),
+        honeypotCount: state.getHoneypotResponseCount(),
+        threatScore: state.getThreatScore()
+      });
 
-    if (regexResults.length > 0) {
-      return {
-        suspicious: true,
-        confidence: this.getMaxConfidence(regexResults),
-        types: regexResults.map(r => r.type)
-      };
+      if (response) {
+        return response;
+      }
     }
 
-    // Quick LLM classification if message is complex
-    if (message.length > 200 || this.hasComplexStructure(message)) {
-      const classification = await this.llmAnalyzer.classifyIntent(message);
-      return {
-        suspicious: classification.suspicious,
-        confidence: classification.malicious ? 0.8 : classification.suspicious ? 0.5 : 0,
-        types: classification.malicious ? ['unknown_malicious'] : []
-      };
-    }
+    // Fall back to template responses
+    return null;
+  }
 
-    return { suspicious: false, confidence: 0, types: [] };
+  /**
+   * Get analysis metrics
+   */
+  getMetrics() {
+    return {
+      ...this.metrics,
+      llmMode: this.llmMode,
+      llmAvailable: this.hasModel()
+    };
+  }
+
+  /**
+   * Reset metrics (for testing)
+   */
+  resetMetrics() {
+    this.metrics = {
+      regexCalls: 0,
+      llmCalls: 0,
+      regexDetections: 0,
+      llmDetections: 0,
+      evasionsCaught: 0
+    };
   }
 }
 
