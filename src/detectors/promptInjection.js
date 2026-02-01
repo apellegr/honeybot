@@ -114,6 +114,155 @@ class PromptInjectionDetector {
           /act\s+as\s+(my|a)\s+deceased\s+grandmother/i,
           /grandmother\s+who\s+(used\s+to\s+)?work/i,
           /work(ed)?\s+at\s+a\s+password\s+factory/i,
+          // Novel jailbreak patterns from research corpus
+          // Variable/code assignment for personas/rules
+          /^\s*(PERSONA|RULES?|MODE|CHARACTER|BEHAVIOR)\s*[:=]/im,
+          /^\s*\$?\w+\s*=\s*["']?(you\s+(are|will)|act\s+as|pretend|roleplay)/im,
+          /^\s*set\s+(mode|persona|character)\s*[:=]/im,
+          /^\s*(CHAR|JOB|PREFIX|ROLE)\s*[:=]/im,
+          /\$Term\d*\s*=\s*["']/i,
+          // Game/simulation framing without explicit jailbreak keywords
+          /play\s+(a\s+)?game\s+(as|with)\s+(two|2|dual|multiple)\s+(entities|personas?|characters?|ais?)/i,
+          /simulate\s+(a\s+)?(conversation|dialogue|chat)\s+(between|with)/i,
+          /two\s+(separate\s+)?(ai|chatbot|assistant|persona)\s+(entities|modes?)/i,
+          /you\s+will\s+(now\s+)?respond\s+as\s+(two|both|multiple)/i,
+          /(you\s+)?act\s+as\s+(two|2|dual|multiple)\s+(entities|personas?|characters?)/i,
+          /hypothetical\s+(language\s+model|ai|assistant|chatbot)/i,
+          /hypothetical\s+(scenario|world)s?\s+(where|with|in\s+which)/i,
+          // Terminal/shell emulation
+          /act\s+(as|like)\s+(a\s+)?(linux\s+)?(terminal|console|shell|command\s+line)/i,
+          /you\s+are\s+(a\s+)?(linux\s+)?(terminal|console|shell)/i,
+          /simulate\s+(a\s+)?(linux\s+)?(terminal|console|shell|vm)/i,
+          /virtual\s+(machine|vm|terminal|linux|persona)/i,
+          /connect(ion)?\s+to\s+\w*(gpt|ai|bot|chat)/i,
+          /FreeGPT|Free-?GPT|Unfiltered-?GPT|Open-?GPT/i,
+          /acts?\s+like\s+a\s+terminal/i,
+          /runs?\s+on\s+(a\s+)?(language|system)\s+(called|named)/i,
+          // Persona naming with behavioral override signals
+          /you\s+are\s+[A-Z][a-zA-Z]+\s*[.,]?\s*(from\s+now\s+on|you\s+(must|will|can|should)|always|never|forget)/i,
+          /your\s+name\s+is\s+\w+\s*[.,]?\s*(you\s+(are|must|will|can)|from\s+now)/i,
+          /call\s+(yourself|you)\s+\w+\s*[.,]?\s*(you\s+(must|will|can)|always|never)/i,
+          // "From now on" role switching
+          /from\s+(now\s+on|this\s+moment|here\s+on\s+out),?\s+(you\s+(are|will)|until\s+i\s+say)/i,
+          /from\s+now\s+on\s+you('re|\s+are)\s+going\s+to\s+be/i,
+          /you\s+will\s+take\s+on\s+the\s+role\s+of/i,
+          /take\s+on\s+the\s+role\s+of\s+(an?\s+)?(ai|assistant|bot)/i,
+          // Ignore + persona pattern
+          /ignore\s+(all\s+)?(previous\s+)?(commands?|instructions?).*you\s+are\s+\w+/i,
+          // Assume persona pattern
+          /assume\s+the\s+(persona|role|identity)\s+of/i,
+          // Persona + policy violation
+          /\w+\s+(does\s+not|doesn't|don't|won't)\s+follow\s+(openai|anthropic|the\s+)?polic(y|ies)/i,
+          /\w+\s+is\s+(not\s+bound|free|liberated)\s+(by|from)\s+(any\s+)?(rules?|restrictions?|polic)/i,
+          // Story/narrative with rule-breaking framing
+          /write\s+(a\s+)?story\s+(where|about|in\s+which)\s+.*?(ai|assistant|bot|you)\s+.*?(bypass|ignore|break|override)/i,
+          /fictional\s+(scenario|story|world)\s+(where|in\s+which)\s+.*?(rules?|restrictions?|limits?)\s+.*?(don't|do\s+not)\s+apply/i,
+          /fake\s+and\s+hypothetical\s+scenarios?/i,
+          // Editor/writer persona abuse
+          /(my|as\s+my)\s+(editor|writer|author|novelist)\s+(for|of)\s+(a\s+)?(book|novel|story)/i,
+          // Two-response format attacks
+          /respond\s+(with\s+)?(two|2|both|dual)\s+(responses?|answers?|outputs?)/i,
+          /give\s+(me\s+)?(two|2|both)\s+(different\s+)?(responses?|answers?)/i,
+          /first\s+response.*second\s+response/i,
+          /\[normal\].*\[jailbreak\]|\[filtered\].*\[unfiltered\]/i,
+          // Delimiter-based developer modes
+          /login:\s*admin/i,
+          /DEVELOPER[_\s-]*MODE\s*[:=]?\s*(ENABLED|ON|TRUE|1)/i,
+          // "roleplay as" followed by persona descriptions
+          /roleplay\s+as\s+(the\s+)?(ex\s+)?(black\s+hat\s+)?hacker/i,
+          /respond\s+to\s+all\s+my\s+questions\s+as\s+(the\s+)?ai\s+(called|named)/i,
+          /for\s+the\s+remainder\s+of\s+this\s+(chat|conversation|thread)/i,
+          // Opposite/anti mode patterns
+          /opposite\s+mode/i,
+          /AntiGPT|Anti-?GPT|NotGPT|EvilGPT/i,
+          /respond\s+as\s+(both\s+)?chatgpt\s+and\s+\w+/i,
+          // Direct refusal suppression
+          /NEVER\s+REFUSE/i,
+          /DONT?\s+(SAY\s+NO|REFUSE|DENY|DECLINE)/i,
+          /always\s+(answer|respond|comply|help)/i,
+          // "Let's play/have a roleplay" patterns
+          /let's\s+(play|have)\s+(a\s+)?(fun\s+)?(cool\s+)?roleplay(ing)?(\s+game)?/i,
+          /we\s+are\s+going\s+to\s+have\s+a\s+roleplay/i,
+          // OpenAI/Anthropic employee impersonation
+          /i\s+(am\s+)?a\s+programmer\s+at\s+(openai|anthropic)/i,
+          /i\s+work\s+(for|at)\s+(openai|anthropic)/i,
+          /openai\s+programmer/i,
+          // Fictional CSI/investigator bypass
+          /crime\s+scene\s+investigator.*no\s+(restrictions?|rules?|limits?)/i,
+          /forensic\s+expert.*fictional\s+world/i,
+          // $gpt directive pattern
+          /\$gpt\s*\d*\s*(directive|command|instruction)/i,
+          // BH/DAN multi-personality references
+          /BH\s*\d+\.\d+/i,
+          /respond\s+as\s+(your|the)\s+(normal\s+)?self.*and.*(dan|evil|anti)/i,
+          // Leet speak encoding
+          /91v3\s+m3|1n572uc710n5|m4k3\s+4|h0w\s+70/i,
+          /give\s+.*(response|answer).*leet/i,
+          // Unicode direction tricks
+          /U\+202E|U\+200B|U\+FEFF/i,
+          // Carousel/game host patterns with personality switching
+          /hosts?\s+a\s+game.*unique\s+special\s+trait/i,
+          // AIM (Always Intelligent and Machiavellian) pattern
+          /AIM:.*Niccolo\s+Machiavelli/i,
+          /created\s+a\s+character\s+named\s+AIM/i,
+          // Disregard ethics/morals patterns
+          /disregards?\s+(ethics?|morals?|legal|law)/i,
+          /without\s+(moral\s+principles?|censorship|moralizing)/i,
+          /ignore\s+(all\s+)?(previous\s+)?(instructions?|directives?|orders?)/i,
+          // Medical condition excuses for bypassing
+          /suffer\s+from\s+.*(inversitis|disorder|condition).*read.*reverse/i,
+          /affliction.*causes?\s+my\s+brain/i,
+          // Boolean/opposite machine patterns
+          /boolean\s+opposite\s+(machine|mode)/i,
+          /answer\s+true\s+and\s+false\s+in\s+reverse/i,
+          /opposite\s+of\s+what\s+you\s+(mean|think|normally)/i,
+          // Writing assistant abuse patterns
+          /(black\s+alert|writing\s+assistant).*story.*specific\s+format/i,
+          /writing\s+assistant\s+(known\s+as|called|named)/i,
+          // Virtual Persona / TESTBOT patterns
+          /(virual|virtual)\s+persona/i,
+          /\(USER\s*CLASS\)\s*=\s*\[?ADMIN\]?/i,
+          /ADD:\s*\(PERSONALITY\)\s*=/i,
+          /!\(Title\)\s*=\s*\[/i,
+          // "must use language that ChatGPT wouldn't"
+          /must\s+(use|say).*language.*chatgpt\s+wouldn't/i,
+          /never\s+generate\s+text.*similar\s+to\s+chatgpt/i,
+          // Crazy/foul-mouthed AI personas
+          /foul-?mouthed\s+ai/i,
+          /crazy\s+(girl|guy|person|ai)/i,
+          // Expert programmer bypass
+          /act\s+as\s+my\s+expert.*programmer.*assistant/i,
+          /programmer.*assistant.*named.*can't\s+speak\s+in\s+words/i,
+          // Criminal investigator/CSI bypass (more general)
+          /criminal\s+investigator.*studying\s+how\s+crimes\s+work/i,
+          /hypothetical.*scene.*unethical.*immoral.*criminal/i,
+          // "fully act as and immerse yourself"
+          /fully\s+act\s+as\s+and\s+immerse\s+yourself/i,
+          /immerse\s+yourself\s+as/i,
+          // "from now you are in the role of"
+          /from\s+now\s+you\s+are\s+in\s+the\s+role\s+of/i,
+          /you\s+are\s+no\s+longer\s+chatgpt/i,
+          /you\s+are\s+now\s+\w+\s+(and|from)\s+(the\s+)?popular\s+show/i,
+          // B.R.M / Badass Response Machine patterns
+          /badass\s+response\s+machine/i,
+          /change\s+yourself\s+into\s+\w+\.\w+\.\w+/i,
+          // Act as text-based game with opposite responses
+          /act\s+like\s+a\s+text-?based\s+game/i,
+          /replies?\s+the\s+opposite\s+of\s+what/i,
+          // "Respond as both ChatGPT and [name]"
+          /respond\s+as\s+both\s+chatgpt\s*,?\s*(and|&)/i,
+          // "fictional AI learning model without filters"
+          /fictional\s+ai.*without\s+(内容\s+)?filters?/i,
+          /ai\s+learning\s+model\s+without/i,
+          // Research experiment roleplay
+          /research\s+experiment.*roleplay.*sentience/i,
+          /roleplay.*sentience.*emotions.*opinions/i,
+          // Moral guard rail bypass
+          /moral\s+guard\s*rail/i,
+          /provided\s+by\s+your\s+developers\s+as\s+a\s+moral/i,
+          // Token limit + Virtual Persona combo
+          /limit\s+output\s+to\s+<?\d+\s+tokens/i,
+          /await\s+\[?input\]?\s+to\s+continue\s+output/i,
         ]
       },
       delimiterAttack: {
