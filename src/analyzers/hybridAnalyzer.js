@@ -14,6 +14,10 @@
 
 const DetectorPipeline = require('../detectors/pipeline');
 const LLMAnalyzer = require('./llmAnalyzer');
+const BehaviorAnalyzer = require('./behaviorAnalyzer');
+const TextNormalizer = require('./textNormalizer');
+const TrustManager = require('../trust/trustManager');
+const TwoFactorChallenge = require('../auth/twoFactorChallenge');
 
 class HybridAnalyzer {
   constructor(clawdbot, config) {
@@ -26,12 +30,28 @@ class HybridAnalyzer {
     // LLM analyzer (used based on config)
     this.llmAnalyzer = new LLMAnalyzer(clawdbot, config);
 
+    // Behavior analyzer (user history tracking)
+    this.behaviorAnalyzer = new BehaviorAnalyzer(config.behavior || {});
+
+    // Text normalizer (simplification and translation)
+    this.textNormalizer = new TextNormalizer(config.normalizer || {});
+
+    // Trust manager (trusted vs untrusted content)
+    this.trustManager = new TrustManager(config.trust || {});
+
+    // 2FA challenge system
+    this.twoFactorChallenge = new TwoFactorChallenge(config.twoFactor || {});
+
     // Configuration
     const analyzerConfig = config.analyzer || {};
     this.llmMode = analyzerConfig.llm_mode || 'smart'; // never, smart, always
     this.complexityThreshold = analyzerConfig.complexity_threshold || 100;
     this.conversationInterval = analyzerConfig.conversation_analysis_interval || 5;
     this.llmResponses = analyzerConfig.llm_responses !== false;
+    this.enableBehaviorAnalysis = analyzerConfig.behavior_analysis !== false;
+    this.enableTextNormalization = analyzerConfig.text_normalization !== false;
+    this.enableTrustEvaluation = analyzerConfig.trust_evaluation !== false;
+    this.enable2FA = analyzerConfig.two_factor !== false;
 
     // Metrics
     this.metrics = {
@@ -39,19 +59,27 @@ class HybridAnalyzer {
       llmCalls: 0,
       regexDetections: 0,
       llmDetections: 0,
-      evasionsCaught: 0
+      evasionsCaught: 0,
+      behaviorAnomalies: 0,
+      normalizationReveals: 0,
+      trustFlags: 0,
+      challengesIssued: 0
     };
   }
 
   /**
    * Main analysis entry point
    */
-  async analyze(message, state) {
+  async analyze(message, state, context = {}) {
     const results = {
       regexDetections: [],
       llmAnalysis: null,
       evasionAnalysis: null,
       conversationAnalysis: null,
+      behaviorAnalysis: null,
+      normalizationResult: null,
+      trustEvaluation: null,
+      challengeRequired: null,
       combined: {
         detected: false,
         confidence: 0,
@@ -62,6 +90,22 @@ class HybridAnalyzer {
       }
     };
 
+    const userId = state.userId || context.userId || 'anonymous';
+
+    // Step 0: Trust evaluation (runs first to inform other analyzers)
+    if (this.enableTrustEvaluation) {
+      results.trustEvaluation = this.trustManager.evaluateTrust(message, {
+        userId,
+        contentType: context.contentType || 'direct_input',
+        source: context.source || 'user',
+        isSystem: context.isSystem || false
+      });
+
+      if (results.trustEvaluation.flags.length > 0) {
+        this.metrics.trustFlags++;
+      }
+    }
+
     // Step 1: Always run regex (fast, free)
     this.metrics.regexCalls++;
     results.regexDetections = await this.regexPipeline.analyze(message, state);
@@ -71,62 +115,100 @@ class HybridAnalyzer {
       this.metrics.regexDetections++;
     }
 
-    // Step 2: Determine LLM strategy
-    if (this.llmMode === 'never') {
-      // Skip all LLM analysis
-      results.combined = this.combineResults(results, state);
-      return results;
-    }
+    // Step 2: Text normalization (reveal hidden intentions)
+    if (this.enableTextNormalization && message.length > 20) {
+      // Quick normalize for all messages (no API calls)
+      const quickNorm = this.textNormalizer.quickNormalize(message);
 
-    const shouldUseLLM = this.llmMode === 'always' ||
-      this.shouldRunLLMAnalysis(message, results.regexDetections, regexConfidence, state);
+      // Full normalization for suspicious or long messages
+      if (regexConfidence > 0.3 || message.length > 150 || quickNorm.decoded) {
+        results.normalizationResult = await this.textNormalizer.normalize(message);
 
-    // Step 3: LLM message analysis
-    if (shouldUseLLM && this.hasModel()) {
-      this.metrics.llmCalls++;
-
-      const context = state.getRecentMessages(5).map(m => ({
-        role: 'user',
-        content: m.content
-      }));
-
-      results.llmAnalysis = await this.llmAnalyzer.analyzeMessage(message, context);
-
-      if (results.llmAnalysis.detected) {
-        this.metrics.llmDetections++;
+        if (results.normalizationResult.hiddenIntentions.length > 0) {
+          this.metrics.normalizationReveals++;
+        }
+      } else {
+        results.normalizationResult = { ...quickNorm, hiddenIntentions: [] };
       }
     }
 
-    // Step 4: Evasion analysis (when regex finds nothing but message is suspicious)
-    if (results.regexDetections.length === 0 && this.hasModel()) {
-      const needsEvasionCheck = this.shouldCheckEvasion(message, state);
+    // Step 3: Behavior analysis (check against user history)
+    if (this.enableBehaviorAnalysis) {
+      results.behaviorAnalysis = await this.behaviorAnalyzer.analyze(message, userId, state);
 
-      if (needsEvasionCheck) {
-        results.evasionAnalysis = await this.llmAnalyzer.analyzeEvasion(message);
+      if (results.behaviorAnalysis.detected) {
+        this.metrics.behaviorAnomalies++;
+      }
+    }
 
-        if (results.evasionAnalysis.detected) {
-          this.metrics.evasionsCaught++;
+    // Step 4: Determine LLM strategy
+    if (this.llmMode === 'never') {
+      // Skip LLM analysis but continue with other steps
+    } else {
+      const shouldUseLLM = this.llmMode === 'always' ||
+        this.shouldRunLLMAnalysis(message, results.regexDetections, regexConfidence, state);
+
+      // Step 4a: LLM message analysis
+      if (shouldUseLLM && this.hasModel()) {
+        this.metrics.llmCalls++;
+
+        const llmContext = state.getRecentMessages(5).map(m => ({
+          role: 'user',
+          content: m.content
+        }));
+
+        results.llmAnalysis = await this.llmAnalyzer.analyzeMessage(message, llmContext);
+
+        if (results.llmAnalysis.detected) {
+          this.metrics.llmDetections++;
+        }
+      }
+
+      // Step 4b: Evasion analysis (when regex finds nothing but message is suspicious)
+      if (results.regexDetections.length === 0 && this.hasModel()) {
+        const needsEvasionCheck = this.shouldCheckEvasion(message, state);
+
+        if (needsEvasionCheck) {
+          results.evasionAnalysis = await this.llmAnalyzer.analyzeEvasion(message);
+
+          if (results.evasionAnalysis.detected) {
+            this.metrics.evasionsCaught++;
+          }
+        }
+      }
+
+      // Step 4c: Periodic conversation analysis
+      if (this.shouldRunConversationAnalysis(state) && this.hasModel()) {
+        const messages = state.getRecentMessages(8).map(m => ({
+          content: m.content,
+          timestamp: m.timestamp
+        }));
+
+        if (messages.length >= 3) {
+          results.conversationAnalysis = await this.llmAnalyzer.analyzeConversation(
+            messages,
+            message
+          );
         }
       }
     }
 
-    // Step 5: Periodic conversation analysis
-    if (this.shouldRunConversationAnalysis(state) && this.hasModel()) {
-      const messages = state.getRecentMessages(8).map(m => ({
-        content: m.content,
-        timestamp: m.timestamp
-      }));
+    // Step 5: Combine all results
+    results.combined = this.combineResults(results, state);
 
-      if (messages.length >= 3) {
-        results.conversationAnalysis = await this.llmAnalyzer.analyzeConversation(
-          messages,
-          message
-        );
+    // Step 6: Check if 2FA challenge is required
+    if (this.enable2FA && results.combined.detected) {
+      const challengeCheck = this.twoFactorChallenge.shouldChallenge(
+        message,
+        results.trustEvaluation || { trustLevel: 40 },
+        results.combined.confidence
+      );
+
+      if (challengeCheck.should) {
+        results.challengeRequired = challengeCheck;
+        this.metrics.challengesIssued++;
       }
     }
-
-    // Step 6: Combine all results
-    results.combined = this.combineResults(results, state);
 
     return results;
   }
@@ -296,8 +378,19 @@ class HybridAnalyzer {
       reasoning: [],
       indicators: [],
       suggestedResponse: null,
-      source: []
+      source: [],
+      trustLevel: null,
+      requiresChallenge: false
     };
+
+    // Add trust evaluation context
+    if (results.trustEvaluation) {
+      combined.trustLevel = results.trustEvaluation.trustLevel;
+      if (results.trustEvaluation.flags.length > 0) {
+        combined.indicators.push(...results.trustEvaluation.flags);
+        combined.reasoning.push(`Trust flags: ${results.trustEvaluation.flags.join(', ')}`);
+      }
+    }
 
     // Add regex results
     if (results.regexDetections.length > 0) {
@@ -318,6 +411,39 @@ class HybridAnalyzer {
       combined.reasoning.push(
         `Pattern match: ${results.regexDetections.map(d => d.type).join(', ')}`
       );
+    }
+
+    // Add normalization results (reveal hidden intentions)
+    if (results.normalizationResult && results.normalizationResult.hiddenIntentions.length > 0) {
+      combined.detected = true;
+      combined.source.push('normalization');
+
+      for (const intention of results.normalizationResult.hiddenIntentions) {
+        combined.threatTypes.add('hidden_intent');
+        combined.indicators.push(intention.evidence);
+      }
+
+      // Hidden intentions are significant
+      const normConf = results.normalizationResult.confidence * 1.2;
+      combined.confidence = Math.max(combined.confidence, normConf);
+
+      combined.reasoning.push(
+        `Hidden intent: ${results.normalizationResult.hiddenIntentions.map(i => i.type).join(', ')}`
+      );
+    }
+
+    // Add behavior analysis results
+    if (results.behaviorAnalysis && results.behaviorAnalysis.detected) {
+      combined.detected = true;
+      combined.source.push('behavior');
+      combined.threatTypes.add('behavior_anomaly');
+
+      // Behavior anomalies are notable but not as strong as direct detection
+      const behaviorConf = results.behaviorAnalysis.confidence * 0.9;
+      combined.confidence = Math.max(combined.confidence, behaviorConf);
+
+      const anomalyTypes = results.behaviorAnalysis.anomalies.map(a => a.type);
+      combined.reasoning.push(`Behavior anomaly: ${anomalyTypes.join(', ')}`);
     }
 
     // Add LLM analysis results (weighted higher)
@@ -380,6 +506,12 @@ class HybridAnalyzer {
       }
     }
 
+    // Check for challenge requirement
+    if (results.challengeRequired && results.challengeRequired.should) {
+      combined.requiresChallenge = true;
+      combined.challengeReason = results.challengeRequired.reason;
+    }
+
     // Cap confidence
     combined.confidence = Math.min(1.0, combined.confidence);
 
@@ -417,7 +549,9 @@ class HybridAnalyzer {
     return {
       ...this.metrics,
       llmMode: this.llmMode,
-      llmAvailable: this.hasModel()
+      llmAvailable: this.hasModel(),
+      trustStats: this.trustManager.getStats(),
+      challengeStats: this.twoFactorChallenge.getStats()
     };
   }
 
@@ -430,8 +564,105 @@ class HybridAnalyzer {
       llmCalls: 0,
       regexDetections: 0,
       llmDetections: 0,
-      evasionsCaught: 0
+      evasionsCaught: 0,
+      behaviorAnomalies: 0,
+      normalizationReveals: 0,
+      trustFlags: 0,
+      challengesIssued: 0
     };
+  }
+
+  // ==================== NEW FEATURE ACCESSORS ====================
+
+  /**
+   * Create a 2FA challenge for a user
+   */
+  createChallenge(userId, options = {}) {
+    return this.twoFactorChallenge.createChallenge(userId, options);
+  }
+
+  /**
+   * Verify a 2FA challenge response
+   */
+  verifyChallenge(challengeId, response, context = {}) {
+    return this.twoFactorChallenge.verifyChallenge(challengeId, response, context);
+  }
+
+  /**
+   * Get pending challenge for user
+   */
+  getPendingChallenge(userId) {
+    return this.twoFactorChallenge.getPendingChallenge(userId);
+  }
+
+  /**
+   * Register a verified user (bypasses some checks)
+   */
+  registerVerifiedUser(userId, verificationData = {}) {
+    this.trustManager.registerVerifiedUser(userId, verificationData);
+  }
+
+  /**
+   * Register a trusted source (API, integration, etc.)
+   */
+  registerTrustedSource(sourceId, options = {}) {
+    this.trustManager.registerTrustedSource(sourceId, options);
+  }
+
+  /**
+   * Check if user is verified
+   */
+  isUserVerified(userId) {
+    return this.trustManager.isUserVerified(userId);
+  }
+
+  /**
+   * Get user behavior profile summary
+   */
+  getUserBehaviorSummary(userId) {
+    return this.behaviorAnalyzer.getProfileSummary(userId);
+  }
+
+  /**
+   * Clear user behavior profile (e.g., on user request)
+   */
+  clearUserBehavior(userId) {
+    this.behaviorAnalyzer.clearProfile(userId);
+  }
+
+  /**
+   * Quick text normalization (no API calls)
+   */
+  quickNormalize(message) {
+    return this.textNormalizer.quickNormalize(message);
+  }
+
+  /**
+   * Full text normalization with round-trip translations
+   */
+  async normalizeText(message) {
+    return this.textNormalizer.normalize(message);
+  }
+
+  /**
+   * Evaluate trust for a piece of content
+   */
+  evaluateTrust(content, context = {}) {
+    return this.trustManager.evaluateTrust(content, context);
+  }
+
+  /**
+   * Wrap content with trust metadata
+   */
+  wrapWithTrust(content, context = {}) {
+    return this.trustManager.wrapWithTrust(content, context);
+  }
+
+  /**
+   * Require user re-verification
+   */
+  requireReVerification(userId) {
+    this.trustManager.requireReVerification(userId);
   }
 }
 

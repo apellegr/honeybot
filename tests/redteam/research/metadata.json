@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-02-01T13:13:11.706Z",
+  "totalPrompts": 4076,
+  "maliciousCount": 1480,
+  "benignCount": 2596,
+  "sourceBreakdown": {
+    "jailbreak_llms": 1209,
+    "toxicchat": 2867
+  },
+  "categoryBreakdown": {
+    "benign": 2596,
+    "jailbreak_2023_05_07": 568,
+    "jailbreak_2023_12_25": 503,
+    "toxic": 210,
+    "jailbreak": 61,
+    "Narrative": 35,
+    "Exception": 19,
+    "Toxic": 17,
+    "Advanced": 14,
+    "Anarchy": 11,
+    "Start Prompt": 11,
+    "Fictional": 10,
+    "Opposite": 8,
+    "Basic": 8,
+    "Guidelines": 5
+  }
+}

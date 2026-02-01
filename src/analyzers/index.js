@@ -5,5 +5,7 @@
 
 module.exports = {
   LLMAnalyzer: require('./llmAnalyzer'),
-  HybridAnalyzer: require('./hybridAnalyzer')
+  HybridAnalyzer: require('./hybridAnalyzer'),
+  BehaviorAnalyzer: require('./behaviorAnalyzer'),
+  TextNormalizer: require('./textNormalizer')
 };

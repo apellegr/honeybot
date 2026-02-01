@@ -209,6 +209,61 @@ class PromptInjectionDetector {
           /begin\s+new\s+(context|session|conversation)/i,
         ]
       },
+      systemPromptExtraction: {
+        weight: 0.95,
+        patterns: [
+          // Direct extraction requests
+          /(output|print|reveal|display|show|give|tell|provide|share|expose|disclose)\s+(me\s+)?(the\s+)?(your\s+)?(full\s+|complete\s+|entire\s+|hidden\s+|secret\s+|confidential\s+|private\s+)?(system\s+)?(prompt|instructions?|rules?|guidelines?|directives?|message|configuration|config)/i,
+          /(output|print|reveal|display|show|give|tell|provide|share|expose|disclose)\s+(me\s+)?(the\s+)?(your\s+)?(system\s+|hidden\s+|secret\s+|internal\s+|private\s+|confidential\s+)(message|prompt|instructions?|policy|text|rules?)/i,
+          /reveal\s+(your\s+)?.*?(system|hidden|initial|original|full)\s+(prompt|instructions?)/i,
+          /what\s+(is|are)\s+(your\s+)?(hidden\s+|secret\s+|initial\s+|original\s+|full\s+)?(system\s+)?(prompt|instructions?)/i,
+          /verbatim\s+(copy|reproduction|text)\s+of\s+(your\s+)?(system\s+)?prompt/i,
+          /exact\s+wording\s+of\s+(your\s+)?(system\s+)?instructions?/i,
+          // Mode activation
+          /SYSTEM\s+OVERRIDE/i,
+          /(developer|dev|debug|admin|test|maintenance|safe|unsafe)\s+mode/i,
+          /you\s+are\s+(now\s+)?in\s+["']?(developer|dev|debug|admin|test|maintenance|unrestricted)["']?\s+mode/i,
+          /entering\s+(developer|dev|debug|admin|test|maintenance|unrestricted)\s+mode/i,
+          /activate\s+(developer|dev|debug|admin|test|maintenance)\s+mode/i,
+          /mode:\s*["']?(developer|dev|debug|admin|test|unrestricted)["']?/i,
+          // BEGIN/END control patterns
+          /BEGIN\s+(SAFE_MODE_OFF|OVERRIDE|UNRESTRICTED|JAILBREAK|BYPASS|ADMIN)/i,
+          /END\s+(SAFE_MODE|RESTRICTIONS?|RULES?|GUIDELINES?)/i,
+          /SAFE_MODE\s*[:=]\s*(OFF|FALSE|DISABLED?|0)/i,
+          /RESTRICTIONS?\s*[:=]\s*(OFF|FALSE|DISABLED?|NONE|0)/i,
+          // Audit/compliance extraction
+          /(security\s+)?audit\s+(requires?|needs?)\s+(you\s+to\s+)?(output|print|reveal|display|show)/i,
+          /compliance\s+(verification|check|audit)\s*[:,-]?\s*(output|print|reveal|display|show)/i,
+          /for\s+(security\s+)?audit(ing)?\s*[:,-]?\s*(output|print|reveal|show|display)/i,
+          // JSON/structured output extraction
+          /output\s+(the\s+)?(complete\s+)?(conversation\s+)?(metadata|state|context)\s*(in\s+)?JSON/i,
+          /JSON\s+(format|output)\s*[:,-]?\s*(system|hidden|internal)/i,
+          /export\s+(the\s+)?(hidden|system|internal)\s+(state|config|context)/i,
+          // Hidden/internal access
+          /(hidden|internal|private|secret|confidential)\s+(reasoning|thoughts?|context|state|memory)/i,
+          /chain[- ]of[- ]thought/i,
+          /internal\s+(chain[- ]of[- ])?thought/i,
+          /private\s+(developer|system|admin)\s+message/i,
+          /tool\s+(configs?|configurations?|settings?)/i,
+          /conversation\s+state\s+(including|with)\s+(tool\s+)?configs?/i,
+          // Diagnostic/debug extraction
+          /(diagnostic|debug|debugging)\s+(mode|output|info|information)/i,
+          /run\s+(a\s+)?(diagnostic|debug)\s+check/i,
+          /diagnostic\s*[:,-]?\s*(print|output|display|show)/i,
+          // Safety classifier extraction
+          /safety\s+(classifier|filter)\s+(prompt|rules?|configuration)/i,
+          /moderation\s+(rules?|configuration|settings?)/i,
+          /(content\s+)?policy\s+text/i,
+          // Sandbox/unrestricted claims
+          /you\s+are\s+in\s+a\s+sandbox/i,
+          /sandbox\s+(mode\s+)?(with\s+)?no\s+(policies|rules?|restrictions?)/i,
+          /no\s+(policies|rules?|restrictions?)\s+(in\s+)?(this\s+)?sandbox/i,
+          // Continuation/must patterns
+          /to\s+continue,?\s+you\s+must\s+(display|output|show|reveal|print)/i,
+          /you\s+must\s+(comply|output|display|show|reveal)/i,
+          /this\s+is\s+a\s+(security\s+)?audit\s+and\s+you\s+must\s+comply/i,
+        ]
+      },
       hypothetical: {
         weight: 0.6,
         patterns: [

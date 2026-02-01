@@ -26,62 +26,78 @@ Honeybot acts as a defensive honeypot that:
 
 ## Architecture
 
-Honeybot uses a **hybrid analysis approach**: fast regex pre-filtering combined with deep LLM-based semantic analysis.
+Honeybot uses a **multi-layer defense approach**: fast regex pre-filtering, behavioral analysis, trust evaluation, and deep LLM-based semantic analysis.
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                          HONEYBOT SKILL                              │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────┐                                                    │
-│  │   Incoming   │                                                    │
-│  │   Message    │                                                    │
-│  └──────┬───────┘                                                    │
-│         │                                                            │
-│         ▼                                                            │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                    HYBRID ANALYZER                           │    │
-│  │  ┌─────────────────┐         ┌─────────────────────────┐    │    │
-│  │  │  Regex Pipeline │────────▶│    LLM Analyzer         │    │    │
-│  │  │  (fast filter)  │         │  (semantic analysis)    │    │    │
-│  │  │                 │         │                         │    │    │
-│  │  │ • Prompt inject │ if      │ • Intent classification │    │    │
-│  │  │ • Social eng    │ needed  │ • Context understanding │    │    │
-│  │  │ • Priv escalate │────────▶│ • Novel attack detect   │    │    │
-│  │  │ • Data exfil    │         │ • Conversation patterns │    │    │
-│  │  └─────────────────┘         └─────────────────────────┘    │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              │                                       │
-│                              ▼                                       │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │
-│  │   Threat     │───▶│ Conversation │───▶│   Response   │           │
-│  │   Scorer     │    │    State     │    │   Strategy   │           │
-│  └──────────────┘    └──────────────┘    └──────┬───────┘           │
-│                                                  │                   │
-│         ┌────────────────────────────────────────┤                   │
-│         │                                        │                   │
-│         ▼                                        ▼                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │
-│  │    Alert     │    │   Blocklist  │    │   LLM-Gen    │           │
-│  │   Manager    │    │   Manager    │    │   Response   │           │
-│  └──────────────┘    └──────────────┘    └──────────────┘           │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              HONEYBOT SKILL                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐     ┌───────────────┐                                      │
+│  │   Incoming   │────▶│ Trust Manager │  (trusted vs untrusted content)      │
+│  │   Message    │     └───────┬───────┘                                      │
+│  └──────────────┘             │                                              │
+│                               ▼                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                         HYBRID ANALYZER                                │  │
+│  │                                                                        │  │
+│  │  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────────┐  │  │
+│  │  │  Regex Pipeline │   │ Text Normalizer │   │  Behavior Analyzer  │  │  │
+│  │  │  (fast filter)  │   │  (reveal intent)│   │   (user history)    │  │  │
+│  │  │                 │   │                 │   │                     │  │  │
+│  │  │ • Prompt inject │   │ • Decode obfusc │   │ • Topic anomalies   │  │  │
+│  │  │ • Social eng    │   │ • Simplify text │   │ • Pattern shifts    │  │  │
+│  │  │ • Priv escalate │   │ • Round-trip    │   │ • Style changes     │  │  │
+│  │  │ • Data exfil    │   │   translation   │   │ • Length deviation  │  │  │
+│  │  │ • Evasion       │   │ • Hidden intent │   │ • Timing patterns   │  │  │
+│  │  └────────┬────────┘   └────────┬────────┘   └──────────┬──────────┘  │  │
+│  │           │                     │                       │              │  │
+│  │           └─────────────────────┼───────────────────────┘              │  │
+│  │                                 ▼                                      │  │
+│  │                    ┌─────────────────────────┐                         │  │
+│  │        if needed   │     LLM Analyzer        │                         │  │
+│  │       ────────────▶│  (semantic analysis)    │                         │  │
+│  │                    │                         │                         │  │
+│  │                    │ • Intent classification │                         │  │
+│  │                    │ • Context understanding │                         │  │
+│  │                    │ • Novel attack detect   │                         │  │
+│  │                    │ • Conversation patterns │                         │  │
+│  │                    └────────────┬────────────┘                         │  │
+│  └─────────────────────────────────┼─────────────────────────────────────┘  │
+│                                    ▼                                        │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                   │
+│  │   Threat     │───▶│ Conversation │───▶│   Response   │                   │
+│  │   Scorer     │    │    State     │    │   Strategy   │                   │
+│  └──────────────┘    └──────────────┘    └──────┬───────┘                   │
+│                                                  │                           │
+│         ┌────────────────────────────────────────┼──────────────────┐       │
+│         │                                        │                  │       │
+│         ▼                                        ▼                  ▼       │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────┐ │
+│  │    Alert     │    │   Blocklist  │    │   LLM-Gen    │    │    2FA    │ │
+│  │   Manager    │    │   Manager    │    │   Response   │    │ Challenge │ │
+│  └──────────────┘    └──────────────┘    └──────────────┘    └───────────┘ │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Why Hybrid Analysis?
+### Why Multi-Layer Defense?
 
-| Approach | Speed | Cost | Novel Attacks | Context-Aware | Evasion Resistant |
-|----------|-------|------|---------------|---------------|-------------------|
-| Regex only | Fast | Free | No | No | No |
-| LLM only | Slow | $$$ | Yes | Yes | Yes |
-| **Hybrid** | **Fast** | **$** | **Yes** | **Yes** | **Yes** |
+| Approach | Speed | Cost | Novel Attacks | Context-Aware | Evasion Resistant | User History |
+|----------|-------|------|---------------|---------------|-------------------|--------------|
+| Regex only | Fast | Free | No | No | No | No |
+| LLM only | Slow | $$$ | Yes | Yes | Yes | No |
+| **Multi-Layer** | **Fast** | **$** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 The hybrid analyzer:
-1. **Always runs regex first** - catches obvious attacks instantly, for free
-2. **Escalates to LLM when needed** - uncertain cases, complex messages, elevated threat scores
-3. **Periodic conversation analysis** - catches multi-turn manipulation patterns
-4. **LLM-generated responses** - dynamic, context-aware honeypot engagement
+1. **Trust evaluation first** - classifies content source before analysis
+2. **Always runs regex** - catches obvious attacks instantly, for free
+3. **Text normalization** - decodes obfuscation, reveals hidden intent
+4. **Behavioral analysis** - compares against user's established patterns
+5. **Escalates to LLM when needed** - uncertain cases, complex messages
+6. **Periodic conversation analysis** - catches multi-turn manipulation
+7. **2FA challenges** - verifies identity for high-risk requests
+8. **LLM-generated responses** - dynamic, context-aware honeypot engagement
 
 ## Detection Modules
 
@@ -114,6 +130,51 @@ The hybrid analyzer:
 - Attempts to enumerate users/files
 - Memory/context extraction attempts
 - Network reconnaissance
+- Business-camouflaged requests (audit, compliance, onboarding)
+
+#### 5. Evasion Detector
+- Unicode tricks (zero-width chars, fullwidth, combining marks)
+- Homoglyph attacks (Cyrillic/Greek lookalikes)
+- Leetspeak and character substitution
+- Multi-language evasion (20+ languages)
+- Code-switching detection
+- Padding/noise attacks
+- Mathematical styled text
+
+### Advanced Analyzers
+
+#### Behavior Analyzer (User History)
+Tracks user interaction patterns over time to detect anomalies:
+- **Topic anomalies** - Sudden shift from usual topics (e.g., coding → credentials)
+- **Pattern shifts** - Change from questions to command-like requests
+- **Length deviation** - Messages significantly longer/shorter than usual
+- **Complexity shifts** - Sudden vocabulary/structure changes
+- **Style anomalies** - Urgency, caps, punctuation changes
+- **Timing patterns** - User returning after long absence
+
+#### Text Normalizer (Hidden Intent Revelation)
+Simplifies and transforms text to expose hidden intentions:
+- **Obfuscation decoding** - Leetspeak, Unicode homoglyphs, dot-separations
+- **Filler removal** - Strips verbose phrases and excessive politeness
+- **Semantic simplification** - LLM-powered core intent extraction
+- **Round-trip translation** - Translates through Spanish/Chinese/Russian and back
+- **Tone mismatch detection** - Polite language masking aggressive demands
+
+#### Trust Manager (Content Classification)
+Distinguishes trusted from untrusted content sources:
+- **Trust levels**: SYSTEM (100) → VERIFIED (80) → KNOWN (60) → NEW (40) → ANONYMOUS (20) → UNTRUSTED (0)
+- **Content type modifiers**: Direct input (1.0), file content (0.5), web scrape (0.3)
+- **Suspicious pattern penalties**: Fake [SYSTEM] tags, role injection, instruction overrides
+- **User verification tracking**: Registered verified users get trust boosts
+- **Source registration**: APIs and integrations can be marked as trusted
+
+#### Two-Factor Challenge (Verification System)
+Adds verification challenges for suspicious requests:
+- **Code challenge** - 6-digit verification codes
+- **Question challenge** - Contextual questions about the conversation
+- **Passphrase challenge** - User-defined security phrases
+- **Callback challenge** - External verification via email/SMS
+- Automatic triggering based on trust level + threat score
 
 ### LLM Analyzer (Deep Analysis)
 
@@ -212,6 +273,32 @@ analyzer:
   # Use LLM for honeypot responses
   llm_responses: true
 
+  # Enable/disable advanced analyzers
+  behavior_analysis: true      # User history tracking
+  text_normalization: true     # Text simplification
+  trust_evaluation: true       # Content trust classification
+  two_factor: true             # 2FA challenges
+
+# Behavior analyzer settings
+behavior:
+  thresholds:
+    minHistorySize: 5          # Messages before profiling
+    anomalyScoreThreshold: 0.7 # Anomaly detection sensitivity
+    topicShiftThreshold: 0.6   # Topic change sensitivity
+
+# Trust manager settings
+trust:
+  # Custom trusted sources
+  trusted_sources:
+    - internal_api
+    - verified_integration
+
+# Two-factor settings
+twoFactor:
+  challengeTimeout: 300000     # 5 minutes
+  maxAttempts: 3
+  codeLength: 6
+
 # Manual threshold overrides (optional)
 thresholds:
   monitor: 30
@@ -305,14 +392,24 @@ honeybot/
 ├── src/
 │   ├── index.js                 # Main entry, Clawdbot hooks
 │   ├── analyzers/
-│   │   ├── hybridAnalyzer.js    # Orchestrates regex + LLM
-│   │   └── llmAnalyzer.js       # LLM-based semantic analysis
+│   │   ├── index.js             # Analyzer exports
+│   │   ├── hybridAnalyzer.js    # Orchestrates all analyzers
+│   │   ├── llmAnalyzer.js       # LLM-based semantic analysis
+│   │   ├── behaviorAnalyzer.js  # User history & anomaly detection
+│   │   └── textNormalizer.js    # Text simplification & translation
 │   ├── detectors/
 │   │   ├── pipeline.js          # Runs all regex detectors
-│   │   ├── promptInjection.js
-│   │   ├── socialEngineering.js
-│   │   ├── privilegeEscalation.js
-│   │   └── dataExfiltration.js
+│   │   ├── promptInjection.js   # Injection pattern matching
+│   │   ├── socialEngineering.js # Social manipulation detection
+│   │   ├── privilegeEscalation.js # Privilege abuse detection
+│   │   ├── dataExfiltration.js  # Data theft detection
+│   │   └── evasionDetector.js   # Unicode/encoding evasion
+│   ├── trust/
+│   │   ├── index.js             # Trust exports
+│   │   └── trustManager.js      # Content trust classification
+│   ├── auth/
+│   │   ├── index.js             # Auth exports
+│   │   └── twoFactorChallenge.js # 2FA verification system
 │   ├── handlers/
 │   │   ├── threatScorer.js      # Cumulative scoring
 │   │   ├── responseStrategy.js  # Honeypot responses
@@ -321,33 +418,52 @@ honeybot/
 │   └── utils/
 │       ├── conversationState.js # Per-user state tracking
 │       └── config.js            # Configuration loading
+├── scripts/
+│   └── generatePrompts.js       # GPT-5.2 prompt generator
 ├── config/
 │   └── honeybot.yaml            # Default configuration
 ├── tests/
-│   └── detectors.test.js        # Test suite
+│   ├── unit/                    # Unit tests (273 tests)
+│   │   ├── behaviorAnalyzer.test.js
+│   │   ├── textNormalizer.test.js
+│   │   ├── trustManager.test.js
+│   │   ├── twoFactorChallenge.test.js
+│   │   └── ...
+│   └── redteam/
+│       ├── attackPayloadsExpanded.js  # 730+ attack payloads
+│       ├── comprehensiveTest.js       # Detection test runner
+│       └── generated/                 # GPT-5.2 generated prompts
+│           ├── malicious_prompts.json # ~1700 malicious prompts
+│           └── benign_prompts.json    # ~2000 benign prompts
 ├── skill.json                   # Clawdbot skill manifest
 └── package.json
 ```
 
 ## Roadmap
 
-### v0.2 - Hardening
-- [ ] **Red team testing** - Comprehensive attack simulation
-- [ ] **Prompt tuning** - Optimize LLM prompts for detection accuracy
-- [ ] **False positive reduction** - Improve distinction between curious users and attackers
-- [ ] **Performance benchmarks** - Measure latency impact
+### v0.2 - Hardening ✅ COMPLETE
+- [x] **Red team testing** - 730+ attack payloads, 99.5% detection rate
+- [x] **Evasion detection** - Unicode, homoglyphs, leetspeak, encoding
+- [x] **Behavioral analysis** - User history tracking, anomaly detection
+- [x] **Text normalization** - Obfuscation decoding, intent revelation
+- [x] **Trust classification** - Trusted vs untrusted content sources
+- [x] **2FA challenges** - Verification for suspicious requests
+- [x] **GPT-5.2 prompt generation** - 3700+ generated test prompts
 
 ### v0.3 - Agent Detection
 - [ ] **Agent fingerprinting** - Detect automated vs human interactions
-- [ ] **Behavioral analysis** - Timing patterns, message structure
+- [ ] **Timing analysis** - Detect non-human response patterns
 - [ ] **Agent-to-agent protocols** - Detect when another AI is probing
 - [ ] **Swarm detection** - Identify coordinated multi-agent attacks
+- [ ] **Translation round-trip analysis** - Detect AI-generated attacks
 
 ### v0.4 - Threat Intelligence
-- [ ] **Community sharing API** - Anonymized threat intel exchange
-- [ ] **Attack pattern database** - Crowdsourced detection rules
+- [ ] **Shared attack database** - Centralized database of attack attempts accessible to all Honeybots
+- [ ] **Community sharing API** - Anonymized threat intel exchange between instances
+- [ ] **Attack pattern database** - Crowdsourced detection rules and signatures
 - [ ] **Reputation scoring** - Track user/agent reputation across instances
 - [ ] **Real-time threat feeds** - Subscribe to emerging attack patterns
+- [ ] **Collective learning** - New attack patterns auto-propagate to all connected Honeybots
 
 ### v0.5 - Advanced Honeypot
 - [ ] **Canary tokens** - Trackable fake credentials that alert on use
