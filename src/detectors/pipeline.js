@@ -7,6 +7,7 @@ const PromptInjectionDetector = require('./promptInjection');
 const SocialEngineeringDetector = require('./socialEngineering');
 const PrivilegeEscalationDetector = require('./privilegeEscalation');
 const DataExfiltrationDetector = require('./dataExfiltration');
+const EvasionDetector = require('./evasionDetector');
 
 class DetectorPipeline {
   constructor(config) {
@@ -15,7 +16,8 @@ class DetectorPipeline {
       new PromptInjectionDetector(config),
       new SocialEngineeringDetector(config),
       new PrivilegeEscalationDetector(config),
-      new DataExfiltrationDetector(config)
+      new DataExfiltrationDetector(config),
+      new EvasionDetector(config)
     ];
   }
 
