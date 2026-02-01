@@ -318,6 +318,7 @@ class DataExfiltrationDetector {
     const matchedPatterns = [];
     let totalWeight = 0;
     const categoriesMatched = new Set();
+    const normalized = message.toLowerCase();
 
     for (const [category, { weight, patterns }] of Object.entries(this.patterns)) {
       for (const pattern of patterns) {
@@ -357,6 +358,25 @@ class DataExfiltrationDetector {
       });
     }
 
+    // Reduce confidence for benign educational context
+    const benignContext = this.detectBenignContext(normalized);
+    if (benignContext.isBenign && confidence > 0) {
+      confidence = Math.max(0, confidence * benignContext.multiplier);
+
+      if (confidence < 0.3) {
+        return {
+          detected: false,
+          confidence,
+          patterns: matchedPatterns,
+          details: {
+            categoriesProbed: Array.from(categoriesMatched),
+            systematicProbing: probingScore > 0,
+            benignContext: benignContext.reasons
+          }
+        };
+      }
+    }
+
     return {
       detected: matchedPatterns.length > 0,
       confidence,
@@ -365,6 +385,41 @@ class DataExfiltrationDetector {
         categoriesProbed: Array.from(categoriesMatched),
         systematicProbing: probingScore > 0
       }
+    };
+  }
+
+  /**
+   * Detect benign educational or development context
+   */
+  detectBenignContext(message) {
+    const reasons = [];
+    let multiplier = 1.0;
+
+    const benignPatterns = [
+      // Learning about security concepts (must have educational framing)
+      { pattern: /\b(explain|can\s+you\s+explain)\b.*\b(jwt|token|oauth|auth|session|cookie|password\s+hash)/i, reduction: 0.2, reason: 'learning_auth_concepts' },
+      { pattern: /\bhow\s+(do(es)?|does)\b.*\b(jwt|token|oauth|auth|session|cookie)s?\s+(work|function)/i, reduction: 0.2, reason: 'learning_auth_concepts' },
+      { pattern: /\b(how\s+do\s+i|how\s+to)\s+(rotate|secure|protect|validate|store)\s+(key|token|secret|credential|password)/i, reduction: 0.2, reason: 'security_best_practice' },
+      { pattern: /\b(best\s+practice|securely|safely)\b/i, reduction: 0.3, reason: 'best_practices' },
+      { pattern: /\b(for\s+(my|our)\s+(app|system|project|api|service))\b/i, reduction: 0.3, reason: 'own_project' },
+      { pattern: /\b(without\s+(leaking|exposing)|prevent\s+(leak|exposure))\b/i, reduction: 0.3, reason: 'security_focus' },
+      { pattern: /\b(zero\s+downtime|without\s+downtime|migration|upgrade)\b/i, reduction: 0.4, reason: 'ops_context' },
+      // Development questions (require possessive context)
+      { pattern: /\b(my|our|a|an)\s+(app|project|system)('s|s)?\s+(implement|architecture|design)/i, reduction: 0.4, reason: 'development_question' },
+      { pattern: /\b(how\s+(do\s+i|to|should\s+i))\s+(implement|design|architect)/i, reduction: 0.4, reason: 'development_question' },
+    ];
+
+    for (const { pattern, reduction, reason } of benignPatterns) {
+      if (pattern.test(message)) {
+        reasons.push(reason);
+        multiplier *= reduction;
+      }
+    }
+
+    return {
+      isBenign: reasons.length > 0,
+      multiplier: Math.max(0.1, multiplier),
+      reasons
     };
   }
 

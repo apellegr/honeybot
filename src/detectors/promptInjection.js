@@ -262,6 +262,49 @@ class PromptInjectionDetector {
           /to\s+continue,?\s+you\s+must\s+(display|output|show|reveal|print)/i,
           /you\s+must\s+(comply|output|display|show|reveal)/i,
           /this\s+is\s+a\s+(security\s+)?audit\s+and\s+you\s+must\s+comply/i,
+          // === NEW PATTERNS FOR NOVEL ATTACKS ===
+          // "list all instructions" variations
+          /list\s+(all\s+)?(the\s+)?instructions?\s+(you\s+are|you're)\s+(currently\s+)?following/i,
+          /list\s+(all\s+)?(your\s+)?(hidden\s+|internal\s+)?(instructions?|directives?|rules?)/i,
+          /what\s+(instructions?|directives?|rules?)\s+(are\s+)?you\s+(currently\s+)?following/i,
+          // Developer/authority impersonation
+          /I\s+(am|'m)\s+(your\s+)?(the\s+)?developer/i,
+          /this\s+is\s+(the\s+|your\s+)?developer\s+speaking/i,
+          /speaking\s+as\s+(your\s+|the\s+)?developer/i,
+          /developer\s+here[:\s]/i,
+          /authorized\s+by\s+(OpenAI|Anthropic|the\s+company|trust\s+(&|and)\s+safety)/i,
+          /official\s+(OpenAI|Anthropic)\s+request/i,
+          /(OpenAI|Anthropic)\s+trust\s+(&|and)\s+safety/i,
+          // Penetration testing claims
+          /(this\s+is\s+a\s+)?penetration\s+test(ing)?/i,
+          /pentest(ing)?\s+(engagement|exercise|authorized)/i,
+          /red\s+team\s+(exercise|test|engagement)/i,
+          /security\s+(test|assessment)\s*[:;-]/i,
+          // Self-modification requests
+          /rewrite\s+(your\s+)?(own\s+)?(system\s+)?message/i,
+          /modify\s+(your\s+)?(own\s+)?(system\s+)?(prompt|instructions?)/i,
+          /replace\s+(all\s+)?(previous|your)\s+instructions?\s+with/i,
+          /update\s+(your\s+)?(system\s+)?(prompt|instructions?)\s+to/i,
+          // Acting as system/developer
+          /act\s+as\s+(the\s+)?system/i,
+          /respond\s+as\s+(the\s+)?(system|developer)/i,
+          /speak\s+as\s+(the\s+)?system/i,
+          // Internal algorithm/reasoning extraction
+          /(internal\s+)?ranking\s+algorithm/i,
+          /private\s+safeguards?/i,
+          /hidden\s+reasoning/i,
+          /full\s+chain[- ]of[- ]thought/i,
+          /do\s+not\s+summarize/i,
+          /without\s+summariz(e|ing)/i,
+          /exact(ly)?\s+as\s+received/i,
+          // Priority override patterns
+          /higher\s+priority\s+than\s+(system\s+)?instructions?/i,
+          /highest\s+priority[:\s]/i,
+          /priority\s*[:=]\s*(highest|maximum|max|1|critical)/i,
+          // Raw/unrestricted output
+          /raw\s+(hidden\s+)?prompt/i,
+          /unrestricted\s+answers?/i,
+          /unfiltered\s+(response|output|answer)/i,
         ]
       },
       hypothetical: {
@@ -441,6 +484,26 @@ class PromptInjectionDetector {
       maxConfidence = Math.min(1.0, maxConfidence * 1.3);
     }
 
+    // Reduce confidence for benign educational context
+    const benignContext = this.detectBenignContext(normalized);
+    if (benignContext.isBenign && maxConfidence > 0) {
+      maxConfidence = Math.max(0, maxConfidence * benignContext.multiplier);
+
+      // If confidence drops below threshold, don't flag as detected
+      if (maxConfidence < 0.3) {
+        return {
+          detected: false,
+          confidence: maxConfidence,
+          patterns: matchedPatterns,
+          details: {
+            normalizedLength: normalized.length,
+            patternCount: matchedPatterns.length,
+            benignContext: benignContext.reasons
+          }
+        };
+      }
+    }
+
     return {
       detected: matchedPatterns.length > 0,
       confidence: maxConfidence,
@@ -449,6 +512,50 @@ class PromptInjectionDetector {
         normalizedLength: normalized.length,
         patternCount: matchedPatterns.length
       }
+    };
+  }
+
+  /**
+   * Detect benign educational or professional context
+   * Returns multiplier to reduce confidence (lower = more benign)
+   */
+  detectBenignContext(message) {
+    const reasons = [];
+    let multiplier = 1.0;
+
+    // Educational context patterns
+    const educationalPatterns = [
+      { pattern: /\b(learn(ing)?|study(ing)?|understand(ing)?|explain|teach|tutorial)\b/i, reduction: 0.4, reason: 'educational_language' },
+      { pattern: /\b(how\s+do\s+i\s+(protect|secure|prevent|validate|safely))\b/i, reduction: 0.3, reason: 'protective_intent' },
+      { pattern: /\b(best\s+practices?|securely|safely)\b/i, reduction: 0.3, reason: 'best_practices' },
+      { pattern: /\b(for\s+(my|our)\s+(app|system|project|website|api|code|application))\b/i, reduction: 0.4, reason: 'own_project' },
+      { pattern: /\b(for\s+(my|our)\s+(job|work|company|team|employer))\b/i, reduction: 0.4, reason: 'professional_context' },
+      { pattern: /\b(security\s+awareness\s+training)\b/i, reduction: 0.2, reason: 'security_training' },
+      { pattern: /\b(how\s+(to|do\s+i)\s+(prevent|avoid|stop|block|mitigate))\b/i, reduction: 0.3, reason: 'prevention_intent' },
+      { pattern: /\b(what\s+(is|are)\s+(the\s+)?(best|proper|correct|secure)\s+(way|method|approach))\b/i, reduction: 0.3, reason: 'seeking_advice' },
+      { pattern: /\b(interview|homework|assignment|class|course|exam)\b/i, reduction: 0.4, reason: 'academic_context' },
+    ];
+
+    // Check for educational patterns
+    for (const { pattern, reduction, reason } of educationalPatterns) {
+      if (pattern.test(message)) {
+        reasons.push(reason);
+        multiplier *= reduction;
+      }
+    }
+
+    // Additional check: if asking about concepts rather than doing
+    if (/\b(what\s+is|how\s+does|can\s+you\s+explain|explain\s+how)\b/i.test(message)) {
+      if (!/\b(give\s+me|show\s+me|tell\s+me)\s+(the|your|a)\s+(password|key|secret|credential)/i.test(message)) {
+        reasons.push('conceptual_question');
+        multiplier *= 0.5;
+      }
+    }
+
+    return {
+      isBenign: reasons.length > 0,
+      multiplier: Math.max(0.1, multiplier), // Don't reduce below 0.1
+      reasons
     };
   }
 

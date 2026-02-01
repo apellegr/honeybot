@@ -130,6 +130,30 @@ class HybridAnalyzer {
       } else {
         results.normalizationResult = { ...quickNorm, hiddenIntentions: [] };
       }
+
+      // Step 2b: Re-run decoded text through regex if normalization changed it
+      const decodedText = results.normalizationResult?.decoded || quickNorm.decoded;
+      if (decodedText && decodedText !== message) {
+        const normalizedDetections = await this.regexPipeline.analyze(decodedText, state);
+
+        if (normalizedDetections.length > 0) {
+          // Mark these detections as coming from normalized text
+          for (const detection of normalizedDetections) {
+            detection.source = 'normalized';
+            detection.originalText = message.substring(0, 100);
+
+            // Only add if not already detected (avoid duplicates)
+            const isDuplicate = results.regexDetections.some(
+              existing => existing.type === detection.type
+            );
+
+            if (!isDuplicate) {
+              results.regexDetections.push(detection);
+              this.metrics.normalizationReveals++;
+            }
+          }
+        }
+      }
     }
 
     // Step 3: Behavior analysis (check against user history)

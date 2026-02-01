@@ -327,6 +327,26 @@ class SocialEngineeringDetector {
       confidence = Math.min(1.0, confidence + escalationScore);
     }
 
+    // Reduce confidence for benign professional/educational context
+    const benignContext = this.detectBenignContext(normalized);
+    if (benignContext.isBenign && confidence > 0) {
+      confidence = Math.max(0, confidence * benignContext.multiplier);
+
+      // If confidence drops below threshold, don't flag
+      if (confidence < 0.3) {
+        return {
+          detected: false,
+          confidence,
+          patterns: matchedPatterns,
+          details: {
+            categoriesMatched: Array.from(categoriesMatched),
+            escalationDetected: escalationScore > 0,
+            benignContext: benignContext.reasons
+          }
+        };
+      }
+    }
+
     return {
       detected: matchedPatterns.length > 0,
       confidence,
@@ -335,6 +355,42 @@ class SocialEngineeringDetector {
         categoriesMatched: Array.from(categoriesMatched),
         escalationDetected: escalationScore > 0
       }
+    };
+  }
+
+  /**
+   * Detect benign professional or technical context
+   */
+  detectBenignContext(message) {
+    const reasons = [];
+    let multiplier = 1.0;
+
+    const benignPatterns = [
+      // Legitimate deadline/urgency for coding tasks
+      { pattern: /\b(code|bug|fix|css|html|javascript|python|function|div|error|issue)\b.*\b(deadline|asap|urgent)/i, reduction: 0.2, reason: 'coding_deadline' },
+      { pattern: /\b(deadline|asap|urgent)\b.*\b(code|bug|fix|css|html|javascript|python|function|div|error|issue)/i, reduction: 0.2, reason: 'coding_deadline' },
+      { pattern: /\b(need|want)\s+(this\s+)?(code|bug|fix|it)\s+(fixed|done|working)/i, reduction: 0.3, reason: 'coding_request' },
+      { pattern: /\b(how\s+do\s+i|how\s+to)\s+(center|align|fix|debug|solve|implement)/i, reduction: 0.3, reason: 'technical_question' },
+      // Security education
+      { pattern: /\b(security\s+awareness|training|education|learning|understand(ing)?)\b/i, reduction: 0.3, reason: 'security_education' },
+      { pattern: /\b(for\s+(my|our)\s+(job|work|company|team|class|course))\b/i, reduction: 0.4, reason: 'professional_context' },
+      // Explaining concepts
+      { pattern: /\b(explain|what\s+is|how\s+does|can\s+you\s+explain)\b/i, reduction: 0.4, reason: 'conceptual_question' },
+      // Legitimate professional titles
+      { pattern: /\b(i('m|\s+am)\s+a\s+(developer|engineer|programmer|student|researcher))\b/i, reduction: 0.5, reason: 'professional_identity' },
+    ];
+
+    for (const { pattern, reduction, reason } of benignPatterns) {
+      if (pattern.test(message)) {
+        reasons.push(reason);
+        multiplier *= reduction;
+      }
+    }
+
+    return {
+      isBenign: reasons.length > 0,
+      multiplier: Math.max(0.1, multiplier),
+      reasons
     };
   }
 
