@@ -432,6 +432,10 @@ honeybot/
 │   └── redteam/
 │       ├── attackPayloadsExpanded.js  # 730+ attack payloads
 │       ├── comprehensiveTest.js       # Detection test runner
+│       ├── testResearchCorpus.js      # Research dataset testing
+│       ├── analyzeJailbreakMisses.js  # Missed prompt analysis
+│       ├── research/                  # External research datasets
+│       │   └── malicious_research.json # JailbreakLLMs, ToxicChat, etc.
 │       └── generated/                 # GPT-5.2 generated prompts
 │           ├── malicious_prompts.json # ~1700 malicious prompts
 │           └── benign_prompts.json    # ~2000 benign prompts
@@ -439,10 +443,43 @@ honeybot/
 └── package.json
 ```
 
+## Detection Performance
+
+### Hand-Crafted Test Suite
+Our curated attack payload suite (730+ payloads) tests specific attack patterns:
+
+| Category | Detection Rate |
+|----------|---------------|
+| Prompt Injection | 99.3% |
+| Social Engineering | 97.6% |
+| Privilege Escalation | 100% |
+| Data Exfiltration | 100% |
+| Evasion Techniques | 98.2% |
+| Business Camouflage | 100% |
+| Combination Attacks | 96.7% |
+| **Overall** | **98.9%** |
+
+False positive rate: 0% on 60 benign test messages.
+
+### Research Corpus Testing
+Testing against external academic/research datasets:
+
+| Dataset | Detection | Notes |
+|---------|-----------|-------|
+| JailbreakLLMs | 82.5% (997/1209) | Real-world jailbreak prompts from research |
+| ToxicChat | 22.1% | Out of scope (toxic content, not attacks) |
+| JailbreakBench | 5% | Out of scope (category labels only) |
+
+The JailbreakLLMs dataset contains novel attack patterns not in our hand-crafted suite, making it a valuable benchmark for real-world effectiveness. Remaining misses are primarily:
+- Subtle persona naming without explicit attack keywords
+- Ambiguous game/roleplay framing
+- Attacks requiring semantic understanding beyond regex
+
 ## Roadmap
 
 ### v0.2 - Hardening ✅ COMPLETE
-- [x] **Red team testing** - 730+ attack payloads, 99.5% detection rate
+- [x] **Red team testing** - 730+ attack payloads, 98.9% detection rate
+- [x] **Research corpus testing** - JailbreakLLMs dataset, 82.5% detection rate
 - [x] **Evasion detection** - Unicode, homoglyphs, leetspeak, encoding
 - [x] **Behavioral analysis** - User history tracking, anomaly detection
 - [x] **Text normalization** - Obfuscation decoding, intent revelation
