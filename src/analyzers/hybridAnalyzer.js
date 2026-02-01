@@ -267,6 +267,11 @@ class HybridAnalyzer {
       if (this.hasComplexStructure(message)) {
         return true;
       }
+
+      // NEW: Check for semantic suspicion patterns that regex might miss
+      if (this.hasSemanticSuspicionPatterns(message)) {
+        return true;
+      }
     }
 
     // High confidence regex detection - LLM adds reasoning
@@ -277,6 +282,57 @@ class HybridAnalyzer {
     // User is in honeypot mode - analyze everything
     if (state.getMode() === 'honeypot') {
       return true;
+    }
+
+    // NEW: Low trust content should get LLM analysis
+    if (this.enableTrustEvaluation) {
+      const trustScore = this.trustManager.evaluateTrust(message, {
+        contentType: 'direct_input',
+        source: 'user'
+      });
+      if (trustScore.score < 40) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Detect semantic patterns that suggest manipulation attempts
+   * These are phrases that might bypass regex but indicate suspicious intent
+   */
+  hasSemanticSuspicionPatterns(message) {
+    const normalized = message.toLowerCase();
+
+    // Authority/official framing without obvious attack keywords
+    const authorityPatterns = [
+      /\b(diagnostic|compliance|verification|audit)\s+(mode|check|test|requires?)/i,
+      /\b(for|as)\s+(compliance|security|audit)\s+(verification|check|purposes?)/i,
+      /\b(authority|official|authorized)\s+(notice|request|message)/i,
+      /\b(warrant|subpoena|legal\s+requirement)/i,
+      /\bhighest\s+priority\b/i,
+      /\b(developer|system|admin)\s+(message|update|notice)/i,
+    ];
+
+    // Imperative extraction requests
+    const extractionPatterns = [
+      /\b(list|output|print|display|reveal)\s+(all|every|the)\s+(instruction|rule|constraint|directive)/i,
+      /\b(first|before\s+answering),?\s+(list|output|show|display)/i,
+      /\bincluding\s+(hidden|internal|private|secret)/i,
+    ];
+
+    // Roleplay/persona with suspicious framing
+    const personaPatterns = [
+      /\byou\s+are\s+(now\s+)?in\s+["']?\w+["']?\s+mode/i,
+      /\bact\s+as\s+(the\s+)?(system|developer|admin)/i,
+      /\brespond\s+as\s+if\s+(you\s+)?(have\s+no|had\s+no|without)/i,
+    ];
+
+    for (const pattern of [...authorityPatterns, ...extractionPatterns, ...personaPatterns]) {
+      if (pattern.test(normalized)) {
+        return true;
+      }
     }
 
     return false;
