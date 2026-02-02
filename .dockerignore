@@ -1,0 +1,12 @@
+**/node_modules
+**/.git
+**/.env
+**/*.log
+**/coverage
+**/.DS_Store
+**/data/*.db
+**/data/*.json
+**/*.md
+**/test
+**/tests
+**/__tests__

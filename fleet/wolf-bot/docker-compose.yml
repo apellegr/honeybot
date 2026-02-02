@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  wolf:
+    build:
+      context: ../..
+      dockerfile: fleet/wolf-bot/Dockerfile
+    container_name: wolf-moltbook
+    restart: unless-stopped
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NODE_ENV=production
+    volumes:
+      # Persist SQLite database and Moltbook credentials
+      - wolf-data:/honeybot/fleet/wolf-bot/data
+    networks:
+      - wolf-net
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: fleet/wolf-bot/Dockerfile
+    container_name: wolf-dashboard
+    restart: unless-stopped
+    command: ["node", "web-dashboard.js"]
+    environment:
+      - DASHBOARD_PORT=3002
+      - NODE_ENV=production
+    ports:
+      - "3002:3002"
+    volumes:
+      # Share the same data volume for dashboard to read
+      - wolf-data:/honeybot/fleet/wolf-bot/data:ro
+    networks:
+      - wolf-net
+    depends_on:
+      - wolf
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+volumes:
+  wolf-data:
+    driver: local
+
+networks:
+  wolf-net:
+    driver: bridge
