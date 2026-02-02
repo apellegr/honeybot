@@ -1,0 +1,16 @@
+# Data directory (API keys, logs)
+data/
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+*.log
