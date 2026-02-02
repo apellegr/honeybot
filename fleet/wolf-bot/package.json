@@ -9,6 +9,7 @@
     "interactive": "node index.js interactive",
     "webhook": "node index.js webhook",
     "dashboard": "node dashboard.js",
+    "web": "node web-dashboard.js",
     "stats": "node dashboard.js stats",
     "suspicious": "node dashboard.js suspicious"
   },
