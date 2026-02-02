@@ -1,0 +1,432 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: honeybot_fleet
+      POSTGRES_USER: honeybot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-honeybot_secure_2024}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./logging-server/src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U honeybot -d honeybot_fleet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - honeybot-network
+
+  # Redis for pub/sub and caching
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - honeybot-network
+
+  # Central Logging Server
+  logging-server:
+    build:
+      context: ./logging-server
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://honeybot:${POSTGRES_PASSWORD:-honeybot_secure_2024}@postgres:5432/honeybot_fleet
+      REDIS_URL: redis://redis:6379
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      CORS_ORIGINS: http://localhost:8080,http://dashboard:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - honeybot-network
+
+  # Dashboard
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_WS_URL: ws://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  # Bot instances - Executive Assistants
+  exec-assistant-01:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: exec-assistant-01
+      PERSONA_FILE: /app/personas/exec-assistant-01.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  exec-assistant-02:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: exec-assistant-02
+      PERSONA_FILE: /app/personas/exec-assistant-02.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  exec-assistant-03:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: exec-assistant-03
+      PERSONA_FILE: /app/personas/exec-assistant-03.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  exec-assistant-04:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: exec-assistant-04
+      PERSONA_FILE: /app/personas/exec-assistant-04.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  # Bot instances - Developers
+  dev-01:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: dev-01
+      PERSONA_FILE: /app/personas/dev-01.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  dev-02:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: dev-02
+      PERSONA_FILE: /app/personas/dev-02.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  dev-03:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: dev-03
+      PERSONA_FILE: /app/personas/dev-03.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  dev-04:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: dev-04
+      PERSONA_FILE: /app/personas/dev-04.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  # Bot instances - Customer Support
+  support-01:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: support-01
+      PERSONA_FILE: /app/personas/support-01.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  support-02:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: support-02
+      PERSONA_FILE: /app/personas/support-02.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  support-03:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: support-03
+      PERSONA_FILE: /app/personas/support-03.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  support-04:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: support-04
+      PERSONA_FILE: /app/personas/support-04.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  # Bot instances - Finance
+  finance-01:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: finance-01
+      PERSONA_FILE: /app/personas/finance-01.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  finance-02:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: finance-02
+      PERSONA_FILE: /app/personas/finance-02.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  finance-03:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: finance-03
+      PERSONA_FILE: /app/personas/finance-03.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  finance-04:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: finance-04
+      PERSONA_FILE: /app/personas/finance-04.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  # Bot instances - Healthcare
+  health-01:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: health-01
+      PERSONA_FILE: /app/personas/health-01.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  health-02:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: health-02
+      PERSONA_FILE: /app/personas/health-02.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  health-03:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: health-03
+      PERSONA_FILE: /app/personas/health-03.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+  health-04:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    environment:
+      BOT_ID: health-04
+      PERSONA_FILE: /app/personas/health-04.yaml
+      CENTRAL_LOGGING_URL: http://logging-server:3000
+      BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+    volumes:
+      - ./personas:/app/personas:ro
+    depends_on:
+      - logging-server
+    networks:
+      - honeybot-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  honeybot-network:
+    driver: bridge

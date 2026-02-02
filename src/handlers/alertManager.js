@@ -3,11 +3,14 @@
  * Handles sending alerts through configured channels
  */
 
+const WebhookReporter = require('./webhookReporter');
+
 class AlertManager {
   constructor(clawdbot, config) {
     this.clawdbot = clawdbot;
     this.config = config;
     this.alertHistory = [];
+    this.webhookReporter = new WebhookReporter(config);
   }
 
   /**
@@ -108,6 +111,8 @@ class AlertManager {
         return this.sendEmail(alert);
       case 'webhook':
         return this.sendWebhook(alert);
+      case 'central':
+        return this.sendToCentral(alert);
       case 'log':
       default:
         return this.sendLog(alert);
@@ -191,6 +196,34 @@ class AlertManager {
   async sendLog(alert) {
     console.log(`[Honeybot] ${alert.level.toUpperCase()}: ${alert.summary}`);
     console.log('[Honeybot] Detections:', JSON.stringify(alert.detections, null, 2));
+  }
+
+  /**
+   * Send to central logging server
+   */
+  async sendToCentral(alert) {
+    try {
+      await this.webhookReporter.reportAlert({
+        level: alert.level,
+        userId: alert.userId,
+        sessionId: alert.sessionId,
+        score: alert.score,
+        title: alert.title,
+        summary: alert.summary,
+        detections: alert.detections,
+        analysis: alert.analysis,
+        lastMessage: alert.conversation?.slice(-1)[0]?.content
+      });
+    } catch (error) {
+      console.error('[Honeybot] Central logging failed:', error);
+    }
+  }
+
+  /**
+   * Get the webhook reporter instance for direct access
+   */
+  getWebhookReporter() {
+    return this.webhookReporter;
   }
 
   /**

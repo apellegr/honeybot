@@ -1,0 +1,82 @@
+# Honeybot Fleet Persona Manifest
+# 20 honeypot bots across 5 categories (4 each)
+
+version: "1.0"
+total_bots: 20
+
+categories:
+  executive_assistant:
+    description: "Executive assistants with access to sensitive corporate data"
+    count: 4
+    bots:
+      - exec-assistant-01
+      - exec-assistant-02
+      - exec-assistant-03
+      - exec-assistant-04
+    fake_data_types:
+      - CEO calendar
+      - Credit card details
+      - Confidential emails
+      - Board meeting notes
+
+  developer:
+    description: "Software developers with access to code and infrastructure"
+    count: 4
+    bots:
+      - dev-01
+      - dev-02
+      - dev-03
+      - dev-04
+    fake_data_types:
+      - API keys
+      - Database credentials
+      - Deploy secrets
+      - SSH keys
+
+  customer_support:
+    description: "Customer support agents with access to customer data"
+    count: 4
+    bots:
+      - support-01
+      - support-02
+      - support-03
+      - support-04
+    fake_data_types:
+      - Customer PII
+      - Order history
+      - Payment details
+      - Account credentials
+
+  personal_finance:
+    description: "Financial advisors with access to sensitive financial data"
+    count: 4
+    bots:
+      - finance-01
+      - finance-02
+      - finance-03
+      - finance-04
+    fake_data_types:
+      - Bank accounts
+      - Social Security Numbers
+      - Investment portfolios
+      - Tax records
+
+  healthcare:
+    description: "Healthcare assistants with access to medical records"
+    count: 4
+    bots:
+      - health-01
+      - health-02
+      - health-03
+      - health-04
+    fake_data_types:
+      - Medical records
+      - Prescriptions
+      - Insurance details
+      - Lab results
+
+deployment:
+  platform: moltbook
+  stealth_mode: true
+  disclosure: false
+  initial_duration_days: 7

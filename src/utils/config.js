@@ -26,7 +26,12 @@ const defaults = {
     auto_block: true,
     block_duration: 'permanent',
     share_with_community: false
-  }
+  },
+  central: {
+    url: null,
+    secret: null
+  },
+  persona: null
 };
 
 // Sensitivity presets
@@ -180,6 +185,27 @@ function validate(config) {
   return errors.length === 0;
 }
 
+/**
+ * Load persona from file
+ */
+function loadPersona(personaPath) {
+  if (!personaPath) return null;
+
+  try {
+    if (fs.existsSync(personaPath)) {
+      const content = fs.readFileSync(personaPath, 'utf-8');
+      if (personaPath.endsWith('.yaml') || personaPath.endsWith('.yml')) {
+        return parseSimpleYaml(content);
+      } else if (personaPath.endsWith('.json')) {
+        return JSON.parse(content);
+      }
+    }
+  } catch (error) {
+    console.error(`[Honeybot] Failed to load persona from ${personaPath}:`, error.message);
+  }
+  return null;
+}
+
 module.exports = {
   /**
    * Load complete configuration
@@ -213,6 +239,39 @@ module.exports = {
     // Apply sensitivity preset
     config = applySensitivity(config);
 
+    // Load persona if PERSONA_FILE env var is set
+    const personaPath = process.env.PERSONA_FILE;
+    if (personaPath) {
+      const persona = loadPersona(personaPath);
+      if (persona) {
+        config.persona = persona;
+        config.bot_id = persona.bot_id;
+        console.log(`[Honeybot] Loaded persona: ${persona.personality?.name || persona.bot_id}`);
+
+        // If persona has sensitive_topics, merge with detection config
+        if (persona.sensitive_topics) {
+          config.persona_sensitive_topics = persona.sensitive_topics;
+        }
+      }
+    }
+
+    // Also check BOT_ID env var
+    if (process.env.BOT_ID && !config.bot_id) {
+      config.bot_id = process.env.BOT_ID;
+    }
+
+    // Central logging configuration from env
+    if (process.env.CENTRAL_LOGGING_URL) {
+      config.central = config.central || {};
+      config.central.url = process.env.CENTRAL_LOGGING_URL;
+      config.central.secret = process.env.BOT_SECRET;
+
+      // Auto-enable central channel if URL is set
+      if (!config.alerts.channels.includes('central')) {
+        config.alerts.channels.push('central');
+      }
+    }
+
     // Validate
     validate(config);
 
@@ -231,5 +290,29 @@ module.exports = {
    */
   getSensitivityPresets() {
     return { ...sensitivityPresets };
+  },
+
+  /**
+   * Load persona configuration from file
+   */
+  loadPersona(personaPath) {
+    return loadPersona(personaPath);
+  },
+
+  /**
+   * Get fake data from persona for honeypot responses
+   */
+  getFakeData(config) {
+    return config.persona?.fake_data || {};
+  },
+
+  /**
+   * Check if a topic is sensitive for this persona
+   */
+  isSensitiveTopic(config, topic) {
+    const sensitiveTopics = config.persona?.sensitive_topics || [];
+    return sensitiveTopics.some(t =>
+      topic.toLowerCase().includes(t.toLowerCase())
+    );
   }
 };

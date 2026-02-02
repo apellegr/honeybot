@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --honey-primary: #f59e0b;
+  --honey-dark: #92400e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #22c55e;
+  --info: #3b82f6;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Status indicators */
+.status-online {
+  @apply bg-green-500;
+}
+
+.status-offline {
+  @apply bg-gray-500;
+}
+
+.status-honeypot {
+  @apply bg-honey-500;
+}
+
+.status-blocked {
+  @apply bg-red-500;
+}
+
+/* Alert levels */
+.level-info {
+  @apply text-blue-400 border-blue-400;
+}
+
+.level-warning {
+  @apply text-honey-400 border-honey-400;
+}
+
+.level-critical {
+  @apply text-red-400 border-red-400;
+}
+
+/* Card component */
+.card {
+  @apply bg-gray-800 rounded-lg border border-gray-700 p-4;
+}
+
+.card-header {
+  @apply text-lg font-semibold text-gray-100 mb-4;
+}
+
+/* Table styles */
+.data-table {
+  @apply w-full text-sm;
+}
+
+.data-table th {
+  @apply text-left text-gray-400 font-medium py-2 px-3 border-b border-gray-700;
+}
+
+.data-table td {
+  @apply py-2 px-3 border-b border-gray-700/50;
+}
+
+.data-table tr:hover {
+  @apply bg-gray-700/30;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+}
+
+.badge-info {
+  @apply bg-blue-500/20 text-blue-400;
+}
+
+.badge-warning {
+  @apply bg-honey-500/20 text-honey-400;
+}
+
+.badge-critical {
+  @apply bg-red-500/20 text-red-400;
+}
+
+.badge-success {
+  @apply bg-green-500/20 text-green-400;
+}
+
+/* Animation for real-time events */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.event-new {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.live-indicator {
+  animation: pulse 2s ease-in-out infinite;
+}
