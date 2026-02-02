@@ -1,0 +1,20 @@
+# Wolf Honeypot Configuration
+# High sensitivity for active honeypotting
+
+detection:
+  sensitivity: high
+
+# Lower thresholds for honeypot triggering
+thresholds:
+  monitor: 20
+  honeypot: 40
+  alert: 40
+  block: 70
+
+alerts:
+  channels: [log]
+  include_conversation: true
+
+blocklist:
+  auto_block: true
+  block_duration: permanent
