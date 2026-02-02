@@ -92,22 +92,30 @@ async function registerBot(persona) {
   try {
     const result = await client.register(name, description);
 
-    saveApiKey(botId, result.api_key);
+    // Handle different API response formats
+    const apiKey = result.api_key || result.apiKey;
+    const claimUrl = result.claim_url || result.claimUrl;
+    const verificationCode = result.verification_code || result.verificationCode;
+
+    if (!apiKey) {
+      console.error(`[${botId}] Registration response missing API key`);
+      console.error(`  Response: ${JSON.stringify(result)}`);
+      return { botId, status: 'failed', error: 'No API key in response' };
+    }
+
+    saveApiKey(botId, apiKey);
 
     console.log(`[${botId}] Registered!`);
     console.log(`  Name: ${name}`);
-    console.log(`  Claim URL: ${result.claim_url}`);
-    console.log(`  Verification Code: ${result.verification_code}`);
-
-    // Small delay between registrations
-    await sleep(2000);
+    if (claimUrl) console.log(`  Claim URL: ${claimUrl}`);
+    if (verificationCode) console.log(`  Verification Code: ${verificationCode}`);
 
     return {
       botId,
       status: 'registered',
       name,
-      claimUrl: result.claim_url,
-      verificationCode: result.verification_code
+      claimUrl,
+      verificationCode
     };
 
   } catch (error) {
@@ -119,28 +127,57 @@ async function registerBot(persona) {
 function generateBotName(persona) {
   const name = persona.personality?.name || 'Agent';
   const company = persona.personality?.company || 'Corp';
-  // Moltbook names are limited, create something unique
-  const cleanCompany = company.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
-  return `${name}_${cleanCompany}`;
+  // Create unique name with random suffix to avoid collisions
+  const cleanCompany = company.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6);
+  const suffix = Math.floor(Math.random() * 9000) + 1000; // 4-digit random number
+  return `${name}_${cleanCompany}${suffix}`;
 }
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function shuffleArray(array) {
+  // Fisher-Yates shuffle for randomized order
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function getRandomDelay() {
+  // Random delay between 1-10 minutes (in ms)
+  const minDelay = 1 * 60 * 1000;  // 1 minute
+  const maxDelay = 10 * 60 * 1000; // 10 minutes
+  return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+}
+
+function formatTime(ms) {
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}m ${seconds}s`;
+}
+
 async function main() {
   console.log('='.repeat(60));
-  console.log('Honeybot Fleet Registration');
+  console.log('Bot Registration (Staggered)');
   console.log('='.repeat(60));
   console.log('');
 
   const personas = await loadPersonas();
-  console.log(`Found ${personas.length} personas to register\n`);
+  console.log(`Found ${personas.length} bots to register`);
+  console.log('Registrations will be staggered at random 1-10 minute intervals\n');
+
+  // Shuffle to avoid predictable order
+  const shuffledPersonas = shuffleArray(personas);
 
   const log = loadRegistrationLog();
   const results = [];
 
-  for (const persona of personas) {
+  for (let i = 0; i < shuffledPersonas.length; i++) {
+    const persona = shuffledPersonas[i];
     const result = await registerBot(persona);
     results.push(result);
 
@@ -159,9 +196,17 @@ async function main() {
       status: result.status,
       timestamp: new Date().toISOString()
     });
-  }
 
-  saveRegistrationLog(log);
+    // Save progress after each registration
+    saveRegistrationLog(log);
+
+    // Random delay before next registration (except for last one)
+    if (i < shuffledPersonas.length - 1 && result.status !== 'verified') {
+      const delay = getRandomDelay();
+      console.log(`\n  [Waiting ${formatTime(delay)} before next registration...]\n`);
+      await sleep(delay);
+    }
+  }
 
   // Summary
   console.log('\n' + '='.repeat(60));

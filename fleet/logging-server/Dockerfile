@@ -8,7 +8,7 @@ RUN apk add --no-cache curl
 
 # Install dependencies first (for better caching)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy application source
 COPY src ./src

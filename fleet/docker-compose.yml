@@ -47,7 +47,7 @@ services:
       DATABASE_URL: postgres://honeybot:${POSTGRES_PASSWORD:-honeybot_secure_2024}@postgres:5432/honeybot_fleet
       REDIS_URL: redis://redis:6379
       BOT_SECRET: ${BOT_SECRET:-change-me-in-production}
-      CORS_ORIGINS: http://localhost:8080,http://dashboard:8080
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8081,http://dashboard:8080
     ports:
       - "3000:3000"
     depends_on:
@@ -72,7 +72,7 @@ services:
       VITE_API_URL: http://localhost:3000
       VITE_WS_URL: ws://localhost:3000
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       - logging-server
     networks:

@@ -80,7 +80,10 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/events', authenticateBot, eventsRouter);
+// Events: POST requires auth, GET is public (for dashboard)
+app.post('/api/events', authenticateBot);
+app.post('/api/events/batch', authenticateBot);
+app.use('/api/events', eventsRouter);
 app.use('/api/bots', botsRouter);
 app.use('/api/metrics', metricsRouter);
 app.use('/api/sessions', sessionsRouter);

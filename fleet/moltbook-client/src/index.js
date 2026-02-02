@@ -114,14 +114,15 @@ class MoltbookClient {
       throw error;
     }
 
-    return data.data;
+    // API returns content at root level (not wrapped in 'data')
+    return data;
   }
 
   // ==================== Registration ====================
 
   /**
    * Register a new agent (no auth required)
-   * @returns {Object} { api_key, claim_url, verification_code }
+   * @returns {Object} { api_key, claim_url, verification_code, name }
    */
   async register(name, description) {
     const data = await this.request('POST', '/agents/register', {
@@ -129,9 +130,19 @@ class MoltbookClient {
       description
     }, false);
 
+    // API returns data inside 'agent' object
+    const agent = data.agent || data;
+
     // Store the API key
-    this.apiKey = data.api_key;
-    return data;
+    this.apiKey = agent.api_key;
+
+    return {
+      api_key: agent.api_key,
+      claim_url: agent.claim_url,
+      verification_code: agent.verification_code,
+      name: agent.name,
+      profile_url: agent.profile_url
+    };
   }
 
   // ==================== Profile ====================

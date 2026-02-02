@@ -48,14 +48,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { io } from 'socket.io-client'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3000'
-
 const socket = ref(null)
 const connected = ref(false)
 
 onMounted(() => {
-  socket.value = io(WS_URL)
+  // Connect to same origin (nginx proxies to logging server)
+  socket.value = io(window.location.origin)
 
   socket.value.on('connect', () => {
     connected.value = true

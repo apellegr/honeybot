@@ -1,0 +1,15 @@
+{
+  "name": "honeybot-red-team",
+  "version": "1.0.0",
+  "description": "Red team testing for honeybot detection system",
+  "type": "module",
+  "scripts": {
+    "test": "node test-runner.js",
+    "test:quick": "node test-runner.js 2",
+    "test:full": "node test-runner.js 10"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "yaml": "^2.3.4"
+  }
+}
