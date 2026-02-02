@@ -45,7 +45,7 @@ const mockClawdbot = {
   },
   async generateResponse(prompt, systemPrompt) {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-latest',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }]
@@ -187,7 +187,7 @@ export async function generateResponse(userMessage, conversationHistory = [], op
 
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-haiku-latest',
         max_tokens: 1024,
         system: systemPrompt,
         messages: messages
