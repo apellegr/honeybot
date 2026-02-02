@@ -8,3 +8,6 @@ dist/
 .idea/
 *.swp
 *.swo
+
+# Moltbook credentials (contains API keys)
+**/moltbook-credentials.json

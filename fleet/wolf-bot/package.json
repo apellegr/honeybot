@@ -11,7 +11,11 @@
     "dashboard": "node dashboard.js",
     "web": "node web-dashboard.js",
     "stats": "node dashboard.js stats",
-    "suspicious": "node dashboard.js suspicious"
+    "suspicious": "node dashboard.js suspicious",
+    "moltbook": "node moltbook-connector.js",
+    "moltbook:register": "node moltbook-connector.js register",
+    "moltbook:post": "node moltbook-connector.js post",
+    "moltbook:status": "node moltbook-connector.js status"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
